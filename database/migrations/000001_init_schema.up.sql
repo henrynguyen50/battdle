@@ -103,3 +103,27 @@ CREATE TABLE IF NOT EXISTS pitch_guesses (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(session_id, puzzle_id)
 );
+
+-- Create game_completions table
+CREATE TABLE game_completions (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
+    puzzle_id INT NOT NULL REFERENCES daily_puzzles(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL,
+    guess_count INT NOT NULL,
+    pitch_matched BOOLEAN DEFAULT FALSE,
+    time_taken_seconds INT DEFAULT 0,
+    completed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(session_id, puzzle_id)
+);
+
+-- Create user_streaks table
+CREATE TABLE user_streaks (
+    session_id VARCHAR(64) PRIMARY KEY,
+    games_played INT DEFAULT 0,
+    games_won INT DEFAULT 0,
+    current_streak INT DEFAULT 0,
+    max_streak INT DEFAULT 0,
+    last_won_puzzle_date DATE,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

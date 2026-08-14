@@ -103,3 +103,60 @@ type Animation struct {
 	AnimationData  string    `json:"animation_data" db:"animation_data"` // JSONB stored as string
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 }
+
+type GameCompletion struct {
+	ID               int       `json:"id" db:"id"`
+	SessionID        string    `json:"session_id" db:"session_id"`
+	PuzzleID         int       `json:"puzzle_id" db:"puzzle_id"`
+	Status           string    `json:"status" db:"status"` // "won" or "lost"
+	GuessCount       int       `json:"guess_count" db:"guess_count"`
+	PitchMatched     bool      `json:"pitch_matched" db:"pitch_matched"`
+	TimeTakenSeconds int       `json:"time_taken_seconds" db:"time_taken_seconds"`
+	CompletedAt      time.Time `json:"completed_at" db:"completed_at"`
+}
+
+type UserStreak struct {
+	SessionID         string     `json:"session_id" db:"session_id"`
+	GamesPlayed       int        `json:"games_played" db:"games_played"`
+	GamesWon          int        `json:"games_won" db:"games_won"`
+	CurrentStreak     int        `json:"current_streak" db:"current_streak"`
+	MaxStreak         int        `json:"max_streak" db:"max_streak"`
+	LastWonPuzzleDate *time.Time `json:"last_won_puzzle_date,omitempty" db:"last_won_puzzle_date"`
+	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+type GuessDistributionMap map[string]int
+
+type UserStats struct {
+	GamesPlayed    int  `json:"games_played"`
+	GamesWon       int  `json:"games_won"`
+	CurrentStreak  int  `json:"current_streak"`
+	MaxStreak      int  `json:"max_streak"`
+	UserGuessCount int  `json:"user_guess_count"`
+	Solved         bool `json:"solved"`
+}
+
+type DailyStats struct {
+	TotalSolved   int                  `json:"total_solved"`
+	TotalAttempts int                  `json:"total_attempts"`
+	WinRate       float64              `json:"win_rate"`
+	Distribution  GuessDistributionMap `json:"distribution"`
+	UserStats     *UserStats           `json:"user_stats,omitempty"`
+}
+
+type LeaderboardEntry struct {
+	Rank         int       `json:"rank"`
+	PlayerName   string    `json:"player_name"`
+	GuessCount   int       `json:"guess_count"`
+	PitchMatched bool      `json:"pitch_matched"`
+	TimeSeconds  int       `json:"time_seconds"`
+	CompletedAt  time.Time `json:"completed_at"`
+}
+
+type StreakLeaderboardEntry struct {
+	Rank          int     `json:"rank"`
+	PlayerName    string  `json:"player_name"`
+	CurrentStreak int     `json:"current_streak"`
+	MaxStreak     int     `json:"max_streak"`
+	WinRate       float64 `json:"win_rate"`
+}

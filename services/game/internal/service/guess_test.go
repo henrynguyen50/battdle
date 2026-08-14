@@ -20,6 +20,10 @@ type mockRepository struct {
 	savePitchGuessFunc                  func(g *models.PitchGuess) error
 	getPitchProfilesByPlayerIDFunc      func(playerID int) ([]models.PitchProfile, error)
 	resetDailyPuzzleForTestFunc         func(sessionID string) (*models.DailyPuzzle, error)
+	recordGameCompletionFunc            func(sessionID string, puzzleID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error
+	getTodayPuzzleStatsFunc             func(puzzleID int, sessionID string) (*models.DailyStats, error)
+	getDailyLeaderboardFunc             func(puzzleID int, limit int) ([]models.LeaderboardEntry, error)
+	getStreakLeaderboardFunc            func(limit int) ([]models.StreakLeaderboardEntry, error)
 }
 
 func (m *mockRepository) GetPitchProfilesByPlayerID(playerID int) ([]models.PitchProfile, error) {
@@ -101,6 +105,43 @@ func (m *mockRepository) ResetDailyPuzzleForTest(sessionID string) (*models.Dail
 		return m.resetDailyPuzzleForTestFunc(sessionID)
 	}
 	return nil, nil
+}
+
+func (m *mockRepository) RecordGameCompletion(sessionID string, puzzleID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error {
+	if m.recordGameCompletionFunc != nil {
+		return m.recordGameCompletionFunc(sessionID, puzzleID, status, guessCount, pitchMatched, timeTakenSec)
+	}
+	return nil
+}
+
+func (m *mockRepository) GetTodayPuzzleStats(puzzleID int, sessionID string) (*models.DailyStats, error) {
+	if m.getTodayPuzzleStatsFunc != nil {
+		return m.getTodayPuzzleStatsFunc(puzzleID, sessionID)
+	}
+	return &models.DailyStats{
+		TotalSolved:   0,
+		TotalAttempts: 0,
+		WinRate:       0,
+		Distribution: models.GuessDistributionMap{
+			"1": 0, "2": 0, "3": 0, "4": 0, "5": 0,
+			"6": 0, "7": 0, "8": 0, "9+": 0,
+		},
+		UserStats: &models.UserStats{},
+	}, nil
+}
+
+func (m *mockRepository) GetDailyLeaderboard(puzzleID int, limit int) ([]models.LeaderboardEntry, error) {
+	if m.getDailyLeaderboardFunc != nil {
+		return m.getDailyLeaderboardFunc(puzzleID, limit)
+	}
+	return []models.LeaderboardEntry{}, nil
+}
+
+func (m *mockRepository) GetStreakLeaderboard(limit int) ([]models.StreakLeaderboardEntry, error) {
+	if m.getStreakLeaderboardFunc != nil {
+		return m.getStreakLeaderboardFunc(limit)
+	}
+	return []models.StreakLeaderboardEntry{}, nil
 }
 
 func TestCompareCategories(t *testing.T) {
@@ -777,4 +818,149 @@ func TestMilestoneHints_At3And5Guesses(t *testing.T) {
 			t.Errorf("expected PastTeams to be populated for 5 guesses")
 		}
 	})
+}
+
+func TestSubmitGuess_RecordsCompletionOnWin(t *testing.T) {
+	puzzle, target, players := setupSubmitGuessTest()
+	sessionID := "session-win-completion"
+
+	var completedStatus string
+	var completedGuessCount int
+	var completionRecorded bool
+
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+			return nil, nil
+		},
+		hasPlayerBeenGuessedFunc: func(sID string, pID int, playerID int) (bool, error) {
+			return false, nil
+		},
+		saveGuessFunc: func(g *models.Guess) error {
+			return nil
+		},
+		recordGameCompletionFunc: func(sID string, pID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error {
+			completionRecorded = true
+			completedStatus = status
+			completedGuessCount = guessCount
+			return nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	state, err := svc.SubmitGuess(sessionID, puzzle, target.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if state.Status != "won" {
+		t.Errorf("expected won status, got %s", state.Status)
+	}
+	if !completionRecorded {
+		t.Error("expected RecordGameCompletion to be called on win")
+	}
+	if completedStatus != "won" {
+		t.Errorf("expected completedStatus to be 'won', got %s", completedStatus)
+	}
+	if completedGuessCount != 1 {
+		t.Errorf("expected completedGuessCount to be 1, got %d", completedGuessCount)
+	}
+}
+
+func TestSubmitGuess_RecordsCompletionOnLossAfter9Guesses(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-loss-completion"
+
+	var completedStatus string
+	var completedGuessCount int
+	var completionRecorded bool
+
+	existingGuesses := make([]models.Guess, 8)
+	for i := range 8 {
+		existingGuesses[i] = models.Guess{
+			ID:              i + 1,
+			SessionID:       sessionID,
+			PuzzleID:        puzzle.ID,
+			GuessedPlayerID: 2,
+			Result:          "guess",
+		}
+	}
+
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+			return existingGuesses, nil
+		},
+		hasPlayerBeenGuessedFunc: func(sID string, pID int, playerID int) (bool, error) {
+			return false, nil
+		},
+		saveGuessFunc: func(g *models.Guess) error {
+			return nil
+		},
+		recordGameCompletionFunc: func(sID string, pID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error {
+			completionRecorded = true
+			completedStatus = status
+			completedGuessCount = guessCount
+			return nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	// Guess an incorrect player (ID 3) as 9th guess
+	state, err := svc.SubmitGuess(sessionID, puzzle, 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if state.Status != "lost" {
+		t.Errorf("expected lost status after 9 guesses, got %s", state.Status)
+	}
+	if !completionRecorded {
+		t.Error("expected RecordGameCompletion to be called on loss")
+	}
+	if completedStatus != "lost" {
+		t.Errorf("expected completedStatus to be 'lost', got %s", completedStatus)
+	}
+	if completedGuessCount != 9 {
+		t.Errorf("expected completedGuessCount to be 9, got %d", completedGuessCount)
+	}
+}
+
+func TestGetGameState_StatusLostAfter9Guesses(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-state-lost"
+
+	existingGuesses := make([]models.Guess, 9)
+	for i := range 9 {
+		existingGuesses[i] = models.Guess{
+			ID:              i + 1,
+			SessionID:       sessionID,
+			PuzzleID:        puzzle.ID,
+			GuessedPlayerID: 2,
+			Result:          "guess",
+		}
+	}
+
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+			return existingGuesses, nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	state, err := svc.GetGameState(sessionID, puzzle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if state.Status != "lost" {
+		t.Errorf("expected state status to be 'lost' when 9 guesses exist, got %s", state.Status)
+	}
 }

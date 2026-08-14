@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS game_completions;
+DROP TABLE IF EXISTS user_streaks;
 DROP TABLE IF EXISTS animations;
 DROP TABLE IF EXISTS pitch_guesses;
 DROP TABLE IF EXISTS guesses;

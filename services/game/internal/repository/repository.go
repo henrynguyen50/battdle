@@ -3,6 +3,8 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"pitchle/shared/models"
@@ -362,9 +364,10 @@ func (r *Repository) ResetDailyPuzzleForTest(sessionID string) (*models.DailyPuz
 		targetPlayerID := playerIDs[nextIdx]
 		targetPitchProfileID := profileIDs[nextIdx]
 
-		// Delete guesses, pitch guesses, and cached animation for this puzzle
+		// Delete guesses, pitch guesses, game completions, and cached animation for this puzzle
 		_, _ = r.db.Exec("DELETE FROM guesses WHERE puzzle_id = $1", dp.ID)
 		_, _ = r.db.Exec("DELETE FROM pitch_guesses WHERE puzzle_id = $1", dp.ID)
+		_, _ = r.db.Exec("DELETE FROM game_completions WHERE puzzle_id = $1", dp.ID)
 		_, _ = r.db.Exec("DELETE FROM animations WHERE pitch_profile_id = $1", dp.TargetPitchProfileID)
 		// Update daily puzzle
 		updateQuery := `
@@ -430,9 +433,10 @@ func (r *Repository) SetTargetPitcherForTest(playerID int, sessionID string) (*m
 	)
 
 	if err == nil {
-		// Delete guesses, pitch guesses, and cached animation for this puzzle
+		// Delete guesses, pitch guesses, game completions, and cached animation for this puzzle
 		_, _ = r.db.Exec("DELETE FROM guesses WHERE puzzle_id = $1", dp.ID)
 		_, _ = r.db.Exec("DELETE FROM pitch_guesses WHERE puzzle_id = $1", dp.ID)
+		_, _ = r.db.Exec("DELETE FROM game_completions WHERE puzzle_id = $1", dp.ID)
 		_, _ = r.db.Exec("DELETE FROM animations WHERE pitch_profile_id = $1", dp.TargetPitchProfileID)
 		// Update daily puzzle
 		updateQuery := `
@@ -463,4 +467,333 @@ func (r *Repository) SetTargetPitcherForTest(playerID int, sessionID string) (*m
 	}
 
 	return &dp, nil
+}
+
+func formatPlayerName(sessionID string) string {
+	cleanID := strings.TrimSpace(sessionID)
+	if cleanID == "" || strings.EqualFold(cleanID, "anonymous") {
+		return "Player-Anon"
+	}
+	cleanID = strings.TrimPrefix(cleanID, "session-")
+	if len(cleanID) > 6 {
+		cleanID = cleanID[:6]
+	}
+	return "Player-" + strings.ToUpper(cleanID)
+}
+
+// RecordGameCompletion records game result and updates user streak statistics.
+func (r *Repository) RecordGameCompletion(sessionID string, puzzleID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var puzzleDate time.Time
+	err = tx.QueryRow("SELECT puzzle_date FROM daily_puzzles WHERE id = $1", puzzleID).Scan(&puzzleDate)
+	if err != nil {
+		return fmt.Errorf("failed to find puzzle: %w", err)
+	}
+	puzzleDate = puzzleDate.UTC().Truncate(24 * time.Hour)
+
+	// Check if already completed
+	var existingID int
+	var prevStatus string
+	err = tx.QueryRow("SELECT id, status FROM game_completions WHERE session_id = $1 AND puzzle_id = $2", sessionID, puzzleID).Scan(&existingID, &prevStatus)
+	alreadyCompleted := (err == nil)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check existing completion: %w", err)
+	}
+
+	compQuery := `
+		INSERT INTO game_completions (session_id, puzzle_id, status, guess_count, pitch_matched, time_taken_seconds, completed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		ON CONFLICT (session_id, puzzle_id) DO UPDATE SET
+			status = EXCLUDED.status,
+			guess_count = EXCLUDED.guess_count,
+			pitch_matched = EXCLUDED.pitch_matched,
+			time_taken_seconds = EXCLUDED.time_taken_seconds,
+			completed_at = NOW()
+	`
+	_, err = tx.Exec(compQuery, sessionID, puzzleID, status, guessCount, pitchMatched, timeTakenSec)
+	if err != nil {
+		return fmt.Errorf("failed to record game completion: %w", err)
+	}
+
+	// Only update user streak stats if not already completed for this puzzle
+	if !alreadyCompleted && sessionID != "" && !strings.EqualFold(sessionID, "anonymous") {
+		var streak models.UserStreak
+		var lastWon sql.NullTime
+		streakQuery := `
+			SELECT session_id, games_played, games_won, current_streak, max_streak, last_won_puzzle_date
+			FROM user_streaks
+			WHERE session_id = $1
+		`
+		err = tx.QueryRow(streakQuery, sessionID).Scan(
+			&streak.SessionID, &streak.GamesPlayed, &streak.GamesWon,
+			&streak.CurrentStreak, &streak.MaxStreak, &lastWon,
+		)
+
+		if err == sql.ErrNoRows {
+			streak.SessionID = sessionID
+			streak.GamesPlayed = 1
+			if status == "won" {
+				streak.GamesWon = 1
+				streak.CurrentStreak = 1
+				streak.MaxStreak = 1
+				_, err = tx.Exec(`
+					INSERT INTO user_streaks (session_id, games_played, games_won, current_streak, max_streak, last_won_puzzle_date, updated_at)
+					VALUES ($1, $2, $3, $4, $5, $6, NOW())
+				`, sessionID, streak.GamesPlayed, streak.GamesWon, streak.CurrentStreak, streak.MaxStreak, puzzleDate)
+			} else {
+				streak.GamesWon = 0
+				streak.CurrentStreak = 0
+				streak.MaxStreak = 0
+				_, err = tx.Exec(`
+					INSERT INTO user_streaks (session_id, games_played, games_won, current_streak, max_streak, last_won_puzzle_date, updated_at)
+					VALUES ($1, $2, $3, $4, $5, NULL, NOW())
+				`, sessionID, streak.GamesPlayed, streak.GamesWon, streak.CurrentStreak, streak.MaxStreak)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to insert user streak: %w", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to fetch user streak: %w", err)
+		} else {
+			streak.GamesPlayed += 1
+			if status == "won" {
+				streak.GamesWon += 1
+				if lastWon.Valid {
+					prevDate := lastWon.Time.UTC().Truncate(24 * time.Hour)
+					daysDiff := int(puzzleDate.Sub(prevDate).Hours() / 24)
+					if daysDiff == 1 {
+						streak.CurrentStreak += 1
+					} else if daysDiff == 0 {
+						if streak.CurrentStreak == 0 {
+							streak.CurrentStreak = 1
+						}
+					} else {
+						streak.CurrentStreak = 1
+					}
+				} else {
+					streak.CurrentStreak = 1
+				}
+
+				if streak.CurrentStreak > streak.MaxStreak {
+					streak.MaxStreak = streak.CurrentStreak
+				}
+				_, err = tx.Exec(`
+					UPDATE user_streaks
+					SET games_played = $1, games_won = $2, current_streak = $3, max_streak = $4, last_won_puzzle_date = $5, updated_at = NOW()
+					WHERE session_id = $6
+				`, streak.GamesPlayed, streak.GamesWon, streak.CurrentStreak, streak.MaxStreak, puzzleDate, sessionID)
+			} else {
+				streak.CurrentStreak = 0
+				_, err = tx.Exec(`
+					UPDATE user_streaks
+					SET games_played = $1, games_won = $2, current_streak = 0, updated_at = NOW()
+					WHERE session_id = $3
+				`, streak.GamesPlayed, streak.GamesWon, sessionID)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to update user streak: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetTodayPuzzleStats calculates global puzzle stats and personal user streak stats.
+func (r *Repository) GetTodayPuzzleStats(puzzleID int, sessionID string) (*models.DailyStats, error) {
+	var totalSolved int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM game_completions WHERE puzzle_id = $1 AND status = 'won'", puzzleID).Scan(&totalSolved)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count total solved: %w", err)
+	}
+
+	var totalAttempts int
+	attemptQuery := `
+		SELECT COUNT(DISTINCT s_id) FROM (
+			SELECT session_id AS s_id FROM guesses WHERE puzzle_id = $1
+			UNION
+			SELECT session_id AS s_id FROM game_completions WHERE puzzle_id = $1
+		) t
+	`
+	err = r.db.QueryRow(attemptQuery, puzzleID).Scan(&totalAttempts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count total attempts: %w", err)
+	}
+	if totalSolved > totalAttempts {
+		totalAttempts = totalSolved
+	}
+
+	var winRate float64
+	if totalAttempts > 0 {
+		winRate = math.Round((float64(totalSolved)/float64(totalAttempts)*100.0)*10) / 10
+	}
+
+	distribution := models.GuessDistributionMap{
+		"1": 0, "2": 0, "3": 0, "4": 0, "5": 0,
+		"6": 0, "7": 0, "8": 0, "9+": 0,
+	}
+
+	distRows, err := r.db.Query("SELECT guess_count, COUNT(*) FROM game_completions WHERE puzzle_id = $1 AND status = 'won' GROUP BY guess_count", puzzleID)
+	if err == nil {
+		defer distRows.Close()
+		for distRows.Next() {
+			var gCount, count int
+			if err := distRows.Scan(&gCount, &count); err == nil {
+				if gCount >= 1 && gCount <= 8 {
+					distribution[fmt.Sprintf("%d", gCount)] = count
+				} else if gCount >= 9 {
+					distribution["9+"] += count
+				}
+			}
+		}
+	}
+
+	userStats := &models.UserStats{
+		GamesPlayed:    0,
+		GamesWon:       0,
+		CurrentStreak:  0,
+		MaxStreak:      0,
+		UserGuessCount: 0,
+		Solved:         false,
+	}
+
+	if sessionID != "" && !strings.EqualFold(sessionID, "anonymous") {
+		var s models.UserStreak
+		err = r.db.QueryRow("SELECT games_played, games_won, current_streak, max_streak FROM user_streaks WHERE session_id = $1", sessionID).Scan(
+			&s.GamesPlayed, &s.GamesWon, &s.CurrentStreak, &s.MaxStreak,
+		)
+		if err == nil {
+			userStats.GamesPlayed = s.GamesPlayed
+			userStats.GamesWon = s.GamesWon
+			userStats.CurrentStreak = s.CurrentStreak
+			userStats.MaxStreak = s.MaxStreak
+		}
+
+		var comp models.GameCompletion
+		err = r.db.QueryRow("SELECT guess_count, status FROM game_completions WHERE session_id = $1 AND puzzle_id = $2", sessionID, puzzleID).Scan(
+			&comp.GuessCount, &comp.Status,
+		)
+		if err == nil {
+			userStats.UserGuessCount = comp.GuessCount
+			userStats.Solved = (comp.Status == "won")
+		} else {
+			var guessCount int
+			_ = r.db.QueryRow("SELECT COUNT(*) FROM guesses WHERE session_id = $1 AND puzzle_id = $2", sessionID, puzzleID).Scan(&guessCount)
+			userStats.UserGuessCount = guessCount
+		}
+	}
+
+	return &models.DailyStats{
+		TotalSolved:   totalSolved,
+		TotalAttempts: totalAttempts,
+		WinRate:       winRate,
+		Distribution:  distribution,
+		UserStats:     userStats,
+	}, nil
+}
+
+// GetDailyLeaderboard returns top solvers for today's daily puzzle.
+func (r *Repository) GetDailyLeaderboard(puzzleID int, limit int) ([]models.LeaderboardEntry, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	query := `
+		SELECT session_id, guess_count, pitch_matched, time_taken_seconds, completed_at
+		FROM game_completions
+		WHERE puzzle_id = $1 AND status = 'won'
+		ORDER BY guess_count ASC, time_taken_seconds ASC, completed_at ASC
+		LIMIT $2
+	`
+	rows, err := r.db.Query(query, puzzleID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch daily leaderboard: %w", err)
+	}
+	defer rows.Close()
+
+	entries := make([]models.LeaderboardEntry, 0)
+	rank := 1
+	for rows.Next() {
+		var sessionID string
+		var guessCount int
+		var pitchMatched bool
+		var timeTakenSec int
+		var completedAt time.Time
+
+		err := rows.Scan(&sessionID, &guessCount, &pitchMatched, &timeTakenSec, &completedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan leaderboard row: %w", err)
+		}
+
+		entries = append(entries, models.LeaderboardEntry{
+			Rank:         rank,
+			PlayerName:   formatPlayerName(sessionID),
+			GuessCount:   guessCount,
+			PitchMatched: pitchMatched,
+			TimeSeconds:  timeTakenSec,
+			CompletedAt:  completedAt,
+		})
+		rank++
+	}
+
+	return entries, nil
+}
+
+// GetStreakLeaderboard returns top players by active win streak.
+func (r *Repository) GetStreakLeaderboard(limit int) ([]models.StreakLeaderboardEntry, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	query := `
+		SELECT session_id, current_streak, max_streak, games_played, games_won
+		FROM user_streaks
+		WHERE current_streak > 0 OR games_played > 0
+		ORDER BY current_streak DESC, max_streak DESC, games_won DESC, updated_at ASC
+		LIMIT $1
+	`
+	rows, err := r.db.Query(query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch streak leaderboard: %w", err)
+	}
+	defer rows.Close()
+
+	entries := make([]models.StreakLeaderboardEntry, 0)
+	rank := 1
+	for rows.Next() {
+		var sessionID string
+		var currentStreak, maxStreak, gamesPlayed, gamesWon int
+
+		err := rows.Scan(&sessionID, &currentStreak, &maxStreak, &gamesPlayed, &gamesWon)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan streak leaderboard row: %w", err)
+		}
+
+		var winRate float64
+		if gamesPlayed > 0 {
+			winRate = math.Round((float64(gamesWon)/float64(gamesPlayed)*100.0)*10) / 10
+		}
+
+		entries = append(entries, models.StreakLeaderboardEntry{
+			Rank:          rank,
+			PlayerName:    formatPlayerName(sessionID),
+			CurrentStreak: currentStreak,
+			MaxStreak:     maxStreak,
+			WinRate:       winRate,
+		})
+		rank++
+	}
+
+	return entries, nil
 }

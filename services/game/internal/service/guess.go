@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"pitchle/shared/models"
 )
@@ -99,10 +100,13 @@ func (s *GameService) GetGameState(sessionID string, puzzle *models.DailyPuzzle)
 			Result:     g.Result,
 			Categories: feedback,
 		})
-
 		if g.Result == "correct" {
 			status = "won"
 		}
+	}
+
+	if status != "won" && len(guessResults) >= 9 {
+		status = "lost"
 	}
 
 	state := &GameState{
@@ -649,8 +653,34 @@ func (s *GameService) SubmitGuess(sessionID string, puzzle *models.DailyPuzzle, 
 		Result:     result,
 		Categories: feedback,
 	})
+	if state.Status != "won" && len(state.Guesses) >= 9 {
+		state.Status = "lost"
+	}
 
 	isGameOver := state.Status == "won" || state.Status == "lost"
+	if isGameOver {
+		pitchMatched := false
+		if state.PitchGuess != nil && state.PitchGuess.Matched {
+			pitchMatched = true
+		} else {
+			pg, _ := s.repo.GetPitchGuessBySessionAndPuzzle(sessionID, puzzle.ID)
+			if pg != nil && pg.Matched {
+				pitchMatched = true
+			}
+		}
+
+		timeTakenSec := 0
+		allGuesses, _ := s.repo.GetGuessesBySessionAndPuzzle(sessionID, puzzle.ID)
+		if len(allGuesses) > 0 {
+			timeTakenSec = int(time.Since(allGuesses[0].CreatedAt).Seconds())
+		}
+		if timeTakenSec <= 0 {
+			timeTakenSec = 5
+		}
+
+		_ = s.repo.RecordGameCompletion(sessionID, puzzle.ID, state.Status, len(state.Guesses), pitchMatched, timeTakenSec)
+	}
+
 	targetPitchProfile, _ := s.repo.GetPitchProfileByID(puzzle.TargetPitchProfileID)
 	targetProfiles, _ := s.repo.GetPitchProfilesByPlayerID(targetPlayer.ID)
 	state.Hints = generateHints(targetPlayer, targetPitchProfile, targetProfiles, len(state.Guesses), isGameOver)

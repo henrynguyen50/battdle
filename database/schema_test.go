@@ -68,6 +68,8 @@ func TestUpMigrationContainsRequiredTables(t *testing.T) {
 		"guesses",
 		"pitch_guesses",
 		"animations",
+		"game_completions",
+		"user_streaks",
 	}
 
 	for _, table := range requiredTables {
@@ -95,6 +97,8 @@ func TestDownMigrationDropsRequiredTables(t *testing.T) {
 
 	sql := string(contentBytes)
 	requiredDrops := []string{
+		"game_completions",
+		"user_streaks",
 		"animations",
 		"pitch_guesses",
 		"guesses",

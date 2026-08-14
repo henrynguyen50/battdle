@@ -37,6 +37,10 @@ type GameRepository interface {
 	GetPitchGuessBySessionAndPuzzle(sessionID string, puzzleID int) (*models.PitchGuess, error)
 	SavePitchGuess(g *models.PitchGuess) error
 	ResetDailyPuzzleForTest(sessionID string) (*models.DailyPuzzle, error)
+	RecordGameCompletion(sessionID string, puzzleID int, status string, guessCount int, pitchMatched bool, timeTakenSec int) error
+	GetTodayPuzzleStats(puzzleID int, sessionID string) (*models.DailyStats, error)
+	GetDailyLeaderboard(puzzleID int, limit int) ([]models.LeaderboardEntry, error)
+	GetStreakLeaderboard(limit int) ([]models.StreakLeaderboardEntry, error)
 }
 
 type GameService struct {

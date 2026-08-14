@@ -39,6 +39,147 @@ const PitchleGame = {
             });
         }
 
+        // Wire leaderboard modal open button
+        const leaderboardBtn = document.getElementById('btn-open-leaderboard');
+        if (leaderboardBtn) {
+            leaderboardBtn.addEventListener('click', async () => {
+                try {
+                    leaderboardBtn.disabled = true;
+                    const origText = leaderboardBtn.innerHTML;
+                    leaderboardBtn.innerHTML = '<span class="leaderboard-icon">⏳</span> Loading...';
+                    
+                    const [daily, streaks] = await Promise.all([
+                        window.PitchleAPI.getDailyLeaderboard().catch(err => {
+                            console.warn('Failed to load daily leaderboard:', err);
+                            return [];
+                        }),
+                        window.PitchleAPI.getStreakLeaderboard().catch(err => {
+                            console.warn('Failed to load streaks leaderboard:', err);
+                            return [];
+                        })
+                    ]);
+
+                    window.PitchleUI.showLeaderboardModal(daily, streaks);
+                    leaderboardBtn.innerHTML = origText;
+                } catch (err) {
+                    alert('Could not load leaderboard: ' + err.message);
+                } finally {
+                    leaderboardBtn.disabled = false;
+                }
+            });
+        }
+
+        // Wire leaderboard modal close button
+        const closeLeaderboardBtn = document.getElementById('leaderboard-modal-close-btn');
+        if (closeLeaderboardBtn) {
+            closeLeaderboardBtn.addEventListener('click', () => {
+                window.PitchleUI.hideLeaderboardModal();
+            });
+        }
+
+        // Wire leaderboard tab switching
+        const tabDaily = document.getElementById('tab-daily-leaderboard');
+        const tabStreak = document.getElementById('tab-streak-leaderboard');
+        const panelDaily = document.getElementById('panel-daily-leaderboard');
+        const panelStreak = document.getElementById('panel-streak-leaderboard');
+
+        if (tabDaily && tabStreak && panelDaily && panelStreak) {
+            tabDaily.addEventListener('click', () => {
+                tabDaily.classList.add('active');
+                tabStreak.classList.remove('active');
+                panelDaily.style.display = 'block';
+                panelStreak.style.display = 'none';
+            });
+
+            tabStreak.addEventListener('click', () => {
+                tabStreak.classList.add('active');
+                tabDaily.classList.remove('active');
+                panelStreak.style.display = 'block';
+                panelDaily.style.display = 'none';
+            });
+        }
+
+        // Wire Share Score button
+        const shareBtn = document.getElementById('btn-share-score');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', async () => {
+                const text = window.PitchleUI.generateShareText(this.gameState, this.gameState?.answer);
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(text);
+                        window.PitchleUI.showToast('Copied to clipboard! 📋');
+                    } else {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        window.PitchleUI.showToast('Copied to clipboard! 📋');
+                    }
+                } catch (err) {
+                    console.error('Failed to copy share score:', err);
+                    window.PitchleUI.showToast('Failed to copy to clipboard');
+                }
+            });
+        }
+
+        // Wire View 3D Delivery button
+        const viewDeliveryBtn = document.getElementById('btn-view-delivery');
+        if (viewDeliveryBtn) {
+            viewDeliveryBtn.addEventListener('click', () => {
+                window.PitchleUI.hideResultModal();
+                if (window.PitchleAnimation) {
+                    window.PitchleAnimation.handleWatchClick();
+                }
+            });
+        }
+
+        // Wire New Mystery Pitcher Practice button
+        const practiceBtn = document.getElementById('btn-practice-new');
+        if (practiceBtn) {
+            practiceBtn.addEventListener('click', async () => {
+                try {
+                    practiceBtn.disabled = true;
+                    practiceBtn.textContent = '⏳ Loading...';
+                    const newState = await window.PitchleAPI.resetPuzzleForTest();
+                    this.gameState = newState;
+                    this.selectedPitchType = null;
+                    window.PitchleUI.hideResultModal();
+
+                    // Clear search input and selection
+                    const searchInput = document.getElementById('player-search');
+                    if (searchInput) searchInput.value = '';
+                    if (window.PitchleGuess) window.PitchleGuess.clearSelection();
+
+                    // Reset pitch chip selection
+                    const pitchChips = document.querySelectorAll('#pitch-chips .pitch-chip');
+                    pitchChips.forEach(chip => chip.classList.remove('selected'));
+                    const submitPitchBtn = document.getElementById('btn-submit-pitch-guess');
+                    if (submitPitchBtn) {
+                        submitPitchBtn.disabled = true;
+                        submitPitchBtn.textContent = 'Submit Pitch Guess';
+                    }
+
+                    // Reset animation state
+                    if (window.PitchleAnimation) {
+                        window.PitchleAnimation.trajectoryPoints = [];
+                        const replayBtn = document.getElementById('btn-replay');
+                        if (replayBtn) replayBtn.disabled = true;
+                    }
+
+                    this.syncUI();
+                } catch (err) {
+                    alert('Failed to reset puzzle for practice: ' + err.message);
+                } finally {
+                    practiceBtn.disabled = false;
+                    practiceBtn.textContent = '🎲 New Mystery Pitcher (Practice)';
+                }
+            });
+        }
+
         // Wire modal click-outside close
         window.addEventListener('click', (e) => {
             const resultModal = document.getElementById('result-modal');
@@ -54,8 +195,11 @@ const PitchleGame = {
             if (e.target === revealModal) {
                 window.PitchleUI.hideRevealModal();
             }
+            const leaderboardModal = document.getElementById('leaderboard-modal');
+            if (e.target === leaderboardModal) {
+                window.PitchleUI.hideLeaderboardModal();
+            }
         });
-
         // Wire reveal modal close button
         const closeRevealBtn = document.getElementById('reveal-modal-close-btn');
         if (closeRevealBtn) {
@@ -278,7 +422,7 @@ const PitchleGame = {
 
             // Show results modal if won or lost
             if (updatedState.status === 'won' || updatedState.status === 'lost') {
-                window.PitchleUI.showResultModal(updatedState.status, updatedState.answer);
+                await this.showCompletion(updatedState);
             }
         } catch (error) {
             alert(error.message);
@@ -312,7 +456,7 @@ const PitchleGame = {
                 if (step2Badge) step2Badge.classList.add('step-completed');
                 
                 // Show modal if not closed manually
-                window.PitchleUI.showResultModal(this.gameState.status, this.gameState.answer);
+                this.showCompletion(this.gameState);
             } else if (!this.gameState.pitch_guessed) {
                 // Locked until Step 1 (Pitch Guess) is submitted
                 searchInput.disabled = true;
@@ -332,6 +476,16 @@ const PitchleGame = {
         if (watchBtn) {
             watchBtn.disabled = false;
         }
+    },
+
+    async showCompletion(gameState) {
+        let stats = null;
+        try {
+            stats = await window.PitchleAPI.getTodayStats();
+        } catch (err) {
+            console.warn('Could not fetch today statistics:', err);
+        }
+        window.PitchleUI.showCompletionModal(gameState, stats);
     }
 };
 

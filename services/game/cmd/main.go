@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -116,6 +117,80 @@ func main() {
 		}
 
 		writeJSON(w, http.StatusOK, state)
+	})
+
+	mux.HandleFunc("GET /api/v1/puzzle/today/stats", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			sessionID = "anonymous"
+		}
+
+		puzzle, err := puzzleSvc.GetTodayPuzzle()
+		if err != nil {
+			log.Printf("Error getting today's puzzle: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load daily puzzle")
+			return
+		}
+
+		stats, err := repo.GetTodayPuzzleStats(puzzle.ID, sessionID)
+		if err != nil {
+			log.Printf("Error getting today puzzle stats: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load puzzle stats")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, stats)
+	})
+
+	mux.HandleFunc("GET /api/v1/leaderboard/daily", func(w http.ResponseWriter, r *http.Request) {
+		puzzle, err := puzzleSvc.GetTodayPuzzle()
+		if err != nil {
+			log.Printf("Error getting today's puzzle for leaderboard: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load daily puzzle")
+			return
+		}
+
+		limit := 10
+		limitStr := r.URL.Query().Get("limit")
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+
+		leaderboard, err := repo.GetDailyLeaderboard(puzzle.ID, limit)
+		if err != nil {
+			log.Printf("Error getting daily leaderboard: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load daily leaderboard")
+			return
+		}
+		if leaderboard == nil {
+			leaderboard = []models.LeaderboardEntry{}
+		}
+
+		writeJSON(w, http.StatusOK, leaderboard)
+	})
+
+	mux.HandleFunc("GET /api/v1/leaderboard/streaks", func(w http.ResponseWriter, r *http.Request) {
+		limit := 10
+		limitStr := r.URL.Query().Get("limit")
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+
+		leaderboard, err := repo.GetStreakLeaderboard(limit)
+		if err != nil {
+			log.Printf("Error getting streak leaderboard: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load streak leaderboard")
+			return
+		}
+		if leaderboard == nil {
+			leaderboard = []models.StreakLeaderboardEntry{}
+		}
+
+		writeJSON(w, http.StatusOK, leaderboard)
 	})
 
 	mux.HandleFunc("POST /api/v1/puzzle/today/guess", func(w http.ResponseWriter, r *http.Request) {

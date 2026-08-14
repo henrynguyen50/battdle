@@ -54,6 +54,15 @@ const PitchleAPI = {
     async getAnimation() {
         return apiRequest('/puzzle/today/animation');
     },
+    async getTodayStats() {
+        return apiRequest('/puzzle/today/stats');
+    },
+    async getDailyLeaderboard() {
+        return apiRequest('/leaderboard/daily');
+    },
+    async getStreakLeaderboard() {
+        return apiRequest('/leaderboard/streaks');
+    },
 
     async resetPuzzleForTest() {
         return apiRequest('/puzzle/test/reset', {

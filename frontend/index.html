@@ -17,6 +17,9 @@
                     <p class="subtitle">Daily MLB Pitcher Guessing Game</p>
                 </div>
                 <div class="header-actions">
+                    <button id="btn-open-leaderboard" class="btn btn-secondary btn-leaderboard" title="View Statistics & Global Leaderboards">
+                        <span class="leaderboard-icon">🏆</span> Stats & Leaderboard
+                    </button>
                     <button id="btn-test-skenes" class="btn btn-secondary btn-skenes" title="Load Paul Skenes (25.7° Arm Angle, 96.8 mph triple-digit fastball)">⚡ Paul Skenes (Test)</button>
                     <button id="btn-test-reveal-pitcher" class="btn btn-secondary btn-reveal" title="Reveal target pitcher and pitch for testing">👀 Reveal Pitcher (Test)</button>
                     <button id="btn-test-next-pitcher" class="btn btn-secondary btn-test" title="Get a new mystery pitcher for testing">🎲 New Pitcher (Test)</button>
@@ -273,18 +276,176 @@
         </div>
 
         <!-- Win/Loss Modal -->
+        <!-- Victory & Completion Modal ("You Did It!") -->
         <div id="result-modal" class="modal">
-            <div class="modal-content">
+            <div class="modal-content completion-modal-content">
                 <span class="modal-close" id="modal-close-btn">&times;</span>
                 <div class="modal-body">
-                    <h2 id="result-title">Game Over</h2>
-                    <p id="result-message"></p>
-                    <div id="result-details" class="answer-card">
-                        <!-- Target player details -->
+                    <!-- Celebration / Status Banner -->
+                    <div class="completion-header" id="completion-header">
+                        <div class="celebration-icon" id="celebration-icon">🏆</div>
+                        <h2 id="result-title">YOU DID IT! 🏆</h2>
+                        <p id="result-message">Spectacular job! You identified today's mystery pitcher.</p>
+                    </div>
+
+                    <!-- Target Pitcher Spotlight Card -->
+                    <div id="pitcher-spotlight-card" class="spotlight-card">
+                        <div class="spotlight-header">
+                            <div class="spotlight-avatar">⚾</div>
+                            <div class="spotlight-info">
+                                <h3 id="spotlight-name" class="spotlight-player-name">--</h3>
+                                <span id="spotlight-team-badge" class="spotlight-team">--</span>
+                            </div>
+                        </div>
+                        <div class="spotlight-stats-grid">
+                            <div class="spotlight-stat">
+                                <span class="stat-lbl">Arm Slot / Throws</span>
+                                <span id="spotlight-arm" class="stat-val">--</span>
+                            </div>
+                            <div class="spotlight-stat">
+                                <span class="stat-lbl">Height / Age</span>
+                                <span id="spotlight-height-age" class="stat-val">--</span>
+                            </div>
+                            <div class="spotlight-stat">
+                                <span class="stat-lbl">Target Pitch</span>
+                                <span id="spotlight-pitch" class="stat-val highlight">--</span>
+                            </div>
+                            <div class="spotlight-stat">
+                                <span class="stat-lbl">K% / Whiff%</span>
+                                <span id="spotlight-rates" class="stat-val highlight">--</span>
+                            </div>
+                        </div>
+                        <div class="spotlight-arsenal" id="spotlight-arsenal-block">
+                            <span class="stat-lbl">Statcast Arsenal:</span>
+                            <div class="hint-chips" id="spotlight-arsenal-chips"></div>
+                        </div>
+                    </div>
+
+                    <!-- Solvers Counter Banner -->
+                    <div class="solvers-banner" id="solvers-counter-banner">
+                        <span class="solvers-icon">🔥</span>
+                        <span id="solvers-count-text" class="solvers-text">Loading today's solvers...</span>
+                    </div>
+
+                    <!-- Personal Stats Widget -->
+                    <div class="stats-summary-section">
+                        <h4 class="stats-section-title">Personal Statistics</h4>
+                        <div class="personal-stats-grid">
+                            <div class="personal-stat-card">
+                                <span class="stat-number" id="stat-played">0</span>
+                                <span class="stat-name">Played</span>
+                            </div>
+                            <div class="personal-stat-card">
+                                <span class="stat-number" id="stat-win-rate">0%</span>
+                                <span class="stat-name">Win %</span>
+                            </div>
+                            <div class="personal-stat-card">
+                                <span class="stat-number" id="stat-current-streak">0</span>
+                                <span class="stat-name">Current Streak</span>
+                            </div>
+                            <div class="personal-stat-card">
+                                <span class="stat-number" id="stat-max-streak">0</span>
+                                <span class="stat-name">Max Streak</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guess Distribution Bar Chart -->
+                    <div class="distribution-section">
+                        <h4 class="stats-section-title">Guess Distribution</h4>
+                        <div class="guess-distribution-chart" id="guess-distribution-chart">
+                            <!-- Distribution bars rendered dynamically (1, 2, 3, 4, 5, 6, 7, 8, 9+) -->
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="completion-actions">
+                        <button id="btn-share-score" class="btn btn-share" title="Copy spoiler-free score to clipboard">
+                            <span class="share-icon">📋</span> Share Score
+                        </button>
+                        <button id="btn-view-delivery" class="btn btn-secondary btn-view-delivery" title="Watch 3D Pitcher Delivery">
+                            👀 View 3D Delivery
+                        </button>
+                        <button id="btn-practice-new" class="btn btn-secondary btn-practice" title="Play another mystery pitcher for practice">
+                            🎲 New Mystery Pitcher (Practice)
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Global Leaderboard Modal -->
+        <div id="leaderboard-modal" class="modal">
+            <div class="modal-content leaderboard-modal-content">
+                <span class="modal-close" id="leaderboard-modal-close-btn">&times;</span>
+                <div class="modal-body">
+                    <div class="leaderboard-header">
+                        <h2>🏆 Pitchle Leaderboard</h2>
+                        <p class="leaderboard-subtitle">Today's fastest solvers and the longest active win streaks.</p>
+                    </div>
+
+                    <!-- Tab navigation -->
+                    <div class="leaderboard-tabs">
+                        <button type="button" class="tab-btn active" id="tab-daily-leaderboard" data-tab="daily">
+                            🔥 Today's Top Solvers
+                        </button>
+                        <button type="button" class="tab-btn" id="tab-streak-leaderboard" data-tab="streaks">
+                            ⚡ Win Streaks
+                        </button>
+                    </div>
+
+                    <!-- Daily Solvers Tab Panel -->
+                    <div class="tab-panel active" id="panel-daily-leaderboard">
+                        <div class="leaderboard-table-container">
+                            <table class="leaderboard-table" id="table-daily-leaderboard">
+                                <thead>
+                                    <tr>
+                                        <th class="col-rank">Rank</th>
+                                        <th class="col-player">Solver</th>
+                                        <th class="col-guesses">Guesses</th>
+                                        <th class="col-pitch">Pitch Type</th>
+                                        <th class="col-time">Time</th>
+                                        <th class="col-date">Completed</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="daily-leaderboard-tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                            <div id="daily-leaderboard-empty" class="leaderboard-empty" style="display: none;">
+                                <p>No completions recorded yet today. Be the first to solve today's Pitchle!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Win Streaks Tab Panel -->
+                    <div class="tab-panel" id="panel-streak-leaderboard" style="display: none;">
+                        <div class="leaderboard-table-container">
+                            <table class="leaderboard-table" id="table-streak-leaderboard">
+                                <thead>
+                                    <tr>
+                                        <th class="col-rank">Rank</th>
+                                        <th class="col-player">Player</th>
+                                        <th class="col-current">Current Streak</th>
+                                        <th class="col-max">Max Streak</th>
+                                        <th class="col-winrate">Win Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="streak-leaderboard-tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                            <div id="streak-leaderboard-empty" class="leaderboard-empty" style="display: none;">
+                                <p>No active win streaks recorded yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Feedback -->
+        <div id="toast-notification" class="toast-notification">Copied to clipboard! 📋</div>
 
         <!-- Reveal Answer Modal (Testing) -->
         <div id="reveal-modal" class="modal">
@@ -302,11 +463,11 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/api.js?v=6"></script>
-    <script src="js/ui.js?v=6"></script>
-    <script src="js/pitcher_model.js?v=6"></script>
-    <script src="js/delivery.js?v=6"></script>
-    <script src="js/animation.js?v=6"></script>
-    <script src="js/guess.js?v=6"></script>
-    <script src="js/game.js?v=6"></script>
+    <script src="js/api.js?v=7"></script>
+    <script src="js/ui.js?v=7"></script>
+    <script src="js/pitcher_model.js?v=7"></script>
+    <script src="js/delivery.js?v=7"></script>
+    <script src="js/animation.js?v=7"></script>
+    <script src="js/guess.js?v=7"></script>
+    <script src="js/game.js?v=7"></script>
 </html>
