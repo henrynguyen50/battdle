@@ -23,13 +23,20 @@ type CategoryFeedback struct {
 }
 
 type CategoryFeedbackMap struct {
-	Team      CategoryFeedback `json:"team"`
-	Division  CategoryFeedback `json:"division"`
-	Age       CategoryFeedback `json:"age"`
-	Throws    CategoryFeedback `json:"throws"`
-	KPercent  CategoryFeedback `json:"k_percent"`
-	BBPercent CategoryFeedback `json:"bb_percent"`
-	Whiff     CategoryFeedback `json:"whiff"`
+	Team        CategoryFeedback `json:"team"`
+	Division    CategoryFeedback `json:"division"`
+	Country     CategoryFeedback `json:"country"`
+	Height      CategoryFeedback `json:"height"`
+	Age         CategoryFeedback `json:"age"`
+	Debut       CategoryFeedback `json:"debut"`
+	Throws      CategoryFeedback `json:"throws"`
+	KPercent    CategoryFeedback `json:"k_percent"`
+	BBPercent   CategoryFeedback `json:"bb_percent"`
+	Whiff       CategoryFeedback `json:"whiff"`
+	InZone      CategoryFeedback `json:"in_zone"`
+	Groundballs CategoryFeedback `json:"groundballs"`
+	Flyballs    CategoryFeedback `json:"flyballs"`
+	Popups      CategoryFeedback `json:"popups"`
 }
 type PitchFeedback struct {
 	GuessedType string  `json:"guessed_type"`
@@ -157,6 +164,20 @@ func abs(n int) int {
 	}
 	return n
 }
+func parseHeightInches(h string) int {
+	h = strings.Trim(strings.TrimSpace(h), "\"")
+	parts := strings.Split(h, "'")
+	if len(parts) >= 2 {
+		var feet, inches int
+		_, _ = fmt.Sscanf(strings.TrimSpace(parts[0]), "%d", &feet)
+		inchStr := strings.Trim(strings.TrimSpace(parts[1]), "\" ")
+		_, _ = fmt.Sscanf(inchStr, "%d", &inches)
+		if feet > 0 {
+			return feet*12 + inches
+		}
+	}
+	return 0
+}
 func CompareCategories(guessed, target *models.Player) CategoryFeedbackMap {
 	guessedAge := 2026 - guessed.BirthYear
 	targetAge := 2026 - target.BirthYear
@@ -245,6 +266,106 @@ func CompareCategories(guessed, target *models.Player) CategoryFeedbackMap {
 		whiffDir = "lower"
 	}
 
+	// Country
+	gCountry := strings.TrimSpace(guessed.BirthCountry)
+	tCountry := strings.TrimSpace(target.BirthCountry)
+	countryMatched := gCountry != "" && tCountry != "" && strings.EqualFold(gCountry, tCountry)
+	countryDir := ""
+	if countryMatched {
+		countryDir = "equal"
+	}
+
+	// Height
+	gH := parseHeightInches(guessed.Height)
+	tH := parseHeightInches(target.Height)
+	hMatched := gH > 0 && tH > 0 && gH == tH
+	hClose := !hMatched && gH > 0 && tH > 0 && abs(tH-gH) <= 2
+	hDir := ""
+	if gH > 0 && tH > 0 {
+		if tH > gH {
+			hDir = "higher"
+		} else if tH < gH {
+			hDir = "lower"
+		} else {
+			hDir = "equal"
+		}
+	}
+
+	// Debut Year
+	gDebut := guessed.MLBDebutYear
+	tDebut := target.MLBDebutYear
+	debutMatched := gDebut > 0 && tDebut > 0 && gDebut == tDebut
+	debutClose := !debutMatched && gDebut > 0 && tDebut > 0 && abs(tDebut-gDebut) <= 2
+	debutDir := ""
+	if gDebut > 0 && tDebut > 0 {
+		if tDebut > gDebut {
+			debutDir = "higher"
+		} else if tDebut < gDebut {
+			debutDir = "lower"
+		} else {
+			debutDir = "equal"
+		}
+	}
+
+	// In-Zone%
+	izDiff := target.InZonePercent - guessed.InZonePercent
+	izMatched := math.Abs(izDiff) <= 1.5
+	izClose := !izMatched && math.Abs(izDiff) <= 4.0
+	izDir := "equal"
+	if izDiff > 0.05 {
+		izDir = "higher"
+	} else if izDiff < -0.05 {
+		izDir = "lower"
+	}
+
+	// Groundballs%
+	gbDiff := target.GroundballsPercent - guessed.GroundballsPercent
+	gbMatched := math.Abs(gbDiff) <= 2.0
+	gbClose := !gbMatched && math.Abs(gbDiff) <= 5.0
+	gbDir := "equal"
+	if gbDiff > 0.05 {
+		gbDir = "higher"
+	} else if gbDiff < -0.05 {
+		gbDir = "lower"
+	}
+
+	// Flyballs%
+	fbDiff := target.FlyballsPercent - guessed.FlyballsPercent
+	fbMatched := math.Abs(fbDiff) <= 2.0
+	fbClose := !fbMatched && math.Abs(fbDiff) <= 5.0
+	fbDir := "equal"
+	if fbDiff > 0.05 {
+		fbDir = "higher"
+	} else if fbDiff < -0.05 {
+		fbDir = "lower"
+	}
+
+	// Popups%
+	popDiff := target.PopupsPercent - guessed.PopupsPercent
+	popMatched := math.Abs(popDiff) <= 1.5
+	popClose := !popMatched && math.Abs(popDiff) <= 3.5
+	popDir := "equal"
+	if popDiff > 0.05 {
+		popDir = "higher"
+	} else if popDiff < -0.05 {
+		popDir = "lower"
+	}
+
+	displayHeight := strings.TrimSpace(guessed.Height)
+	if displayHeight == "" {
+		displayHeight = "--"
+	}
+
+	displayCountry := guessed.BirthCountry
+	if displayCountry == "" {
+		displayCountry = "--"
+	}
+
+	displayDebut := interface{}(guessed.MLBDebutYear)
+	if guessed.MLBDebutYear <= 0 {
+		displayDebut = "--"
+	}
+
 	return CategoryFeedbackMap{
 		Team: CategoryFeedback{
 			Value:     guessed.TeamName,
@@ -258,11 +379,29 @@ func CompareCategories(guessed, target *models.Player) CategoryFeedbackMap {
 			Close:     divClose,
 			Direction: divDir,
 		},
+		Country: CategoryFeedback{
+			Value:     displayCountry,
+			Matched:   countryMatched,
+			Close:     false,
+			Direction: countryDir,
+		},
+		Height: CategoryFeedback{
+			Value:     displayHeight,
+			Matched:   hMatched,
+			Close:     hClose,
+			Direction: hDir,
+		},
 		Age: CategoryFeedback{
 			Value:     guessedAge,
 			Matched:   ageMatched,
 			Close:     ageClose,
 			Direction: ageDir,
+		},
+		Debut: CategoryFeedback{
+			Value:     displayDebut,
+			Matched:   debutMatched,
+			Close:     debutClose,
+			Direction: debutDir,
 		},
 		Throws: CategoryFeedback{
 			Value:     gHand,
@@ -287,6 +426,30 @@ func CompareCategories(guessed, target *models.Player) CategoryFeedbackMap {
 			Matched:   whiffMatched,
 			Close:     whiffClose,
 			Direction: whiffDir,
+		},
+		InZone: CategoryFeedback{
+			Value:     guessed.InZonePercent,
+			Matched:   izMatched,
+			Close:     izClose,
+			Direction: izDir,
+		},
+		Groundballs: CategoryFeedback{
+			Value:     guessed.GroundballsPercent,
+			Matched:   gbMatched,
+			Close:     gbClose,
+			Direction: gbDir,
+		},
+		Flyballs: CategoryFeedback{
+			Value:     guessed.FlyballsPercent,
+			Matched:   fbMatched,
+			Close:     fbClose,
+			Direction: fbDir,
+		},
+		Popups: CategoryFeedback{
+			Value:     guessed.PopupsPercent,
+			Matched:   popMatched,
+			Close:     popClose,
+			Direction: popDir,
 		},
 	}
 }

@@ -105,22 +105,28 @@ func (m *mockRepository) ResetDailyPuzzleForTest(sessionID string) (*models.Dail
 
 func TestCompareCategories(t *testing.T) {
 	target := &models.Player{
-		ID:           1,
-		MLBID:        1001,
-		Name:         "Clayton Kershaw",
-		BirthYear:    1988, // Age: 2026 - 1988 = 38
-		Position:     "SP",
-		MLBDebutYear: 2008,
-		MLBLastYear:  2024,
-		TeamID:       10,
-		TeamName:     "Dodgers",
-		DivisionID:   100,
-		DivisionName: "NL West",
-		League:       "NL",
-		PitchHand:    "L",
-		KPercent:     25.0,
-		BBPercent:    6.0,
-		WhiffPercent: 28.0,
+		ID:                 1,
+		MLBID:              1001,
+		Name:               "Clayton Kershaw",
+		BirthYear:          1988, // Age: 2026 - 1988 = 38
+		BirthCountry:       "USA",
+		Height:             "6' 4\"",
+		Position:           "SP",
+		MLBDebutYear:       2008,
+		MLBLastYear:        2024,
+		TeamID:             10,
+		TeamName:           "Dodgers",
+		DivisionID:         100,
+		DivisionName:       "NL West",
+		League:             "NL",
+		PitchHand:          "L",
+		KPercent:           25.0,
+		BBPercent:          6.0,
+		WhiffPercent:       28.0,
+		InZonePercent:      48.0,
+		GroundballsPercent: 45.0,
+		FlyballsPercent:    25.0,
+		PopupsPercent:      8.0,
 	}
 
 	tests := []struct {
@@ -131,82 +137,83 @@ func TestCompareCategories(t *testing.T) {
 		{
 			name: "all categories exact match",
 			guessed: &models.Player{
-				ID:           1,
-				MLBID:        1001,
-				Name:         "Clayton Kershaw",
-				BirthYear:    1988,
-				TeamID:       10,
-				TeamName:     "Dodgers",
-				DivisionID:   100,
-				DivisionName: "NL West",
-				League:       "NL",
-				PitchHand:    "L",
-				KPercent:     25.0,
-				BBPercent:    6.0,
-				WhiffPercent: 28.0,
+				ID:                 1,
+				MLBID:              1001,
+				Name:               "Clayton Kershaw",
+				BirthYear:          1988,
+				BirthCountry:       "USA",
+				Height:             "6' 4\"",
+				MLBDebutYear:       2008,
+				TeamID:             10,
+				TeamName:           "Dodgers",
+				DivisionID:         100,
+				DivisionName:       "NL West",
+				League:             "NL",
+				PitchHand:          "L",
+				KPercent:           25.0,
+				BBPercent:          6.0,
+				WhiffPercent:       28.0,
+				InZonePercent:      48.0,
+				GroundballsPercent: 45.0,
+				FlyballsPercent:    25.0,
+				PopupsPercent:      8.0,
 			},
 			want: service.CategoryFeedbackMap{
-				Team:      service.CategoryFeedback{Value: "Dodgers", Matched: true, Close: false, Direction: "equal"},
-				Division:  service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
-				Age:       service.CategoryFeedback{Value: 38, Matched: true, Close: false, Direction: "equal"},
-				Throws:    service.CategoryFeedback{Value: "L", Matched: true, Close: false, Direction: "equal"},
-				KPercent:  service.CategoryFeedback{Value: 25.0, Matched: true, Close: false, Direction: "equal"},
-				BBPercent: service.CategoryFeedback{Value: 6.0, Matched: true, Close: false, Direction: "equal"},
-				Whiff:     service.CategoryFeedback{Value: 28.0, Matched: true, Close: false, Direction: "equal"},
+				Team:        service.CategoryFeedback{Value: "Dodgers", Matched: true, Close: false, Direction: "equal"},
+				Division:    service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
+				Country:     service.CategoryFeedback{Value: "USA", Matched: true, Close: false, Direction: "equal"},
+				Height:      service.CategoryFeedback{Value: "6' 4\"", Matched: true, Close: false, Direction: "equal"},
+				Age:         service.CategoryFeedback{Value: 38, Matched: true, Close: false, Direction: "equal"},
+				Debut:       service.CategoryFeedback{Value: 2008, Matched: true, Close: false, Direction: "equal"},
+				Throws:      service.CategoryFeedback{Value: "L", Matched: true, Close: false, Direction: "equal"},
+				KPercent:    service.CategoryFeedback{Value: 25.0, Matched: true, Close: false, Direction: "equal"},
+				BBPercent:   service.CategoryFeedback{Value: 6.0, Matched: true, Close: false, Direction: "equal"},
+				Whiff:       service.CategoryFeedback{Value: 28.0, Matched: true, Close: false, Direction: "equal"},
+				InZone:      service.CategoryFeedback{Value: 48.0, Matched: true, Close: false, Direction: "equal"},
+				Groundballs: service.CategoryFeedback{Value: 45.0, Matched: true, Close: false, Direction: "equal"},
+				Flyballs:    service.CategoryFeedback{Value: 25.0, Matched: true, Close: false, Direction: "equal"},
+				Popups:      service.CategoryFeedback{Value: 8.0, Matched: true, Close: false, Direction: "equal"},
 			},
 		},
 		{
 			name: "close match on metrics with higher/lower directions",
 			guessed: &models.Player{
-				ID:           2,
-				MLBID:        1002,
-				Name:         "Freddie Freeman",
-				BirthYear:    1990, // Age: 36 (target is 38 -> target higher)
-				TeamID:       11,
-				TeamName:     "Giants",
-				DivisionID:   100,
-				DivisionName: "NL West",
-				League:       "NL",
-				PitchHand:    "R",   // Mismatch
-				KPercent:     22.0,  // diff +3.0 -> close (target higher)
-				BBPercent:    8.0,   // diff -2.0 -> close (target lower)
-				WhiffPercent: 31.0,  // diff -3.0 -> close (target lower)
+				ID:                 2,
+				MLBID:              1002,
+				Name:               "Freddie Freeman",
+				BirthYear:          1990, // Age: 36 (target is 38 -> target higher)
+				BirthCountry:       "USA",
+				Height:             "6' 5\"", // 77 vs 76 -> diff 1 close, target lower
+				MLBDebutYear:       2010,    // diff 2 close, target lower
+				TeamID:             11,
+				TeamName:           "Giants",
+				DivisionID:         100,
+				DivisionName:       "NL West",
+				League:             "NL",
+				PitchHand:          "R",   // Mismatch
+				KPercent:           22.0,  // diff +3.0 -> close (target higher)
+				BBPercent:          8.0,   // diff -2.0 -> close (target lower)
+				WhiffPercent:       31.0,  // diff -3.0 -> close (target lower)
+				InZonePercent:      51.0,  // diff -3.0 -> close (target lower)
+				GroundballsPercent: 42.0,  // diff +3.0 -> close (target higher)
+				FlyballsPercent:    28.0,  // diff -3.0 -> close (target lower)
+				PopupsPercent:      6.0,   // diff +2.0 -> close (target higher)
 			},
 			want: service.CategoryFeedbackMap{
-				Team:      service.CategoryFeedback{Value: "Giants", Matched: false, Close: true, Direction: ""},
-				Division:  service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
-				Age:       service.CategoryFeedback{Value: 36, Matched: false, Close: true, Direction: "higher"},
-				Throws:    service.CategoryFeedback{Value: "R", Matched: false, Close: false, Direction: ""},
-				KPercent:  service.CategoryFeedback{Value: 22.0, Matched: false, Close: true, Direction: "higher"},
-				BBPercent: service.CategoryFeedback{Value: 8.0, Matched: false, Close: true, Direction: "lower"},
-				Whiff:     service.CategoryFeedback{Value: 31.0, Matched: false, Close: true, Direction: "lower"},
-			},
-		},
-		{
-			name: "all miss with directional indicators",
-			guessed: &models.Player{
-				ID:           3,
-				MLBID:        1003,
-				Name:         "Gerrit Cole",
-				BirthYear:    1994, // Age: 32 (diff 6 -> miss, target higher)
-				TeamID:       13,
-				TeamName:     "Yankees",
-				DivisionID:   102,
-				DivisionName: "AL East",
-				League:       "AL",
-				PitchHand:    "R",
-				KPercent:     33.0,  // diff -8.0 -> miss (target lower)
-				BBPercent:    2.0,   // diff +4.0 -> miss (target higher)
-				WhiffPercent: 15.0,  // diff +13.0 -> miss (target higher)
-			},
-			want: service.CategoryFeedbackMap{
-				Team:      service.CategoryFeedback{Value: "Yankees", Matched: false, Close: false, Direction: ""},
-				Division:  service.CategoryFeedback{Value: "AL East", Matched: false, Close: false, Direction: ""},
-				Age:       service.CategoryFeedback{Value: 32, Matched: false, Close: false, Direction: "higher"},
-				Throws:    service.CategoryFeedback{Value: "R", Matched: false, Close: false, Direction: ""},
-				KPercent:  service.CategoryFeedback{Value: 33.0, Matched: false, Close: false, Direction: "lower"},
-				BBPercent: service.CategoryFeedback{Value: 2.0, Matched: false, Close: false, Direction: "higher"},
-				Whiff:     service.CategoryFeedback{Value: 15.0, Matched: false, Close: false, Direction: "higher"},
+				Team:        service.CategoryFeedback{Value: "Giants", Matched: false, Close: true, Direction: ""},
+				Division:    service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
+				Country:     service.CategoryFeedback{Value: "USA", Matched: true, Close: false, Direction: "equal"},
+				Height:      service.CategoryFeedback{Value: "6' 5\"", Matched: false, Close: true, Direction: "lower"},
+				Age:         service.CategoryFeedback{Value: 36, Matched: false, Close: true, Direction: "higher"},
+				Debut:       service.CategoryFeedback{Value: 2010, Matched: false, Close: true, Direction: "lower"},
+				Throws:      service.CategoryFeedback{Value: "R", Matched: false, Close: false, Direction: ""},
+				KPercent:    service.CategoryFeedback{Value: 22.0, Matched: false, Close: true, Direction: "higher"},
+				BBPercent:   service.CategoryFeedback{Value: 8.0, Matched: false, Close: true, Direction: "lower"},
+				Whiff:       service.CategoryFeedback{Value: 31.0, Matched: false, Close: true, Direction: "lower"},
+				InZone:      service.CategoryFeedback{Value: 51.0, Matched: false, Close: true, Direction: "lower"},
+				Groundballs: service.CategoryFeedback{Value: 42.0, Matched: false, Close: true, Direction: "higher"},
+				Flyballs:    service.CategoryFeedback{Value: 28.0, Matched: false, Close: true, Direction: "lower"},
+				Popups:      service.CategoryFeedback{Value: 6.0, Matched: false, Close: true, Direction: "higher"},
 			},
 		},
 	}
@@ -220,8 +227,17 @@ func TestCompareCategories(t *testing.T) {
 			if got.Division != tt.want.Division {
 				t.Errorf("Division feedback = %+v, want %+v", got.Division, tt.want.Division)
 			}
+			if got.Country != tt.want.Country {
+				t.Errorf("Country feedback = %+v, want %+v", got.Country, tt.want.Country)
+			}
+			if got.Height != tt.want.Height {
+				t.Errorf("Height feedback = %+v, want %+v", got.Height, tt.want.Height)
+			}
 			if got.Age != tt.want.Age {
 				t.Errorf("Age feedback = %+v, want %+v", got.Age, tt.want.Age)
+			}
+			if got.Debut != tt.want.Debut {
+				t.Errorf("Debut feedback = %+v, want %+v", got.Debut, tt.want.Debut)
 			}
 			if got.Throws != tt.want.Throws {
 				t.Errorf("Throws feedback = %+v, want %+v", got.Throws, tt.want.Throws)
@@ -234,6 +250,18 @@ func TestCompareCategories(t *testing.T) {
 			}
 			if got.Whiff != tt.want.Whiff {
 				t.Errorf("Whiff feedback = %+v, want %+v", got.Whiff, tt.want.Whiff)
+			}
+			if got.InZone != tt.want.InZone {
+				t.Errorf("InZone feedback = %+v, want %+v", got.InZone, tt.want.InZone)
+			}
+			if got.Groundballs != tt.want.Groundballs {
+				t.Errorf("Groundballs feedback = %+v, want %+v", got.Groundballs, tt.want.Groundballs)
+			}
+			if got.Flyballs != tt.want.Flyballs {
+				t.Errorf("Flyballs feedback = %+v, want %+v", got.Flyballs, tt.want.Flyballs)
+			}
+			if got.Popups != tt.want.Popups {
+				t.Errorf("Popups feedback = %+v, want %+v", got.Popups, tt.want.Popups)
 			}
 		})
 	}

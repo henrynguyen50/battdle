@@ -24,7 +24,8 @@ func (r *Repository) GetPlayerByID(id int) (*models.Player, error) {
 		       COALESCE(d.league, '') AS league,
 		       COALESCE(p.k_percent, 0.0), COALESCE(p.bb_percent, 0.0), COALESCE(p.in_zone_percent, 0.0),
 		       COALESCE(p.whiff_percent, 0.0), COALESCE(p.groundballs_percent, 0.0), COALESCE(p.flyballs_percent, 0.0),
-		       COALESCE(p.popups_percent, 0.0), COALESCE(p.pitch_hand, 'R'), COALESCE(p.arm_angle, 0.0)
+		       COALESCE(p.popups_percent, 0.0), COALESCE(p.pitch_hand, 'R'), COALESCE(p.arm_angle, 0.0),
+		       COALESCE(p.height, ''), COALESCE(p.birth_country, ''), COALESCE(p.birth_city, '')
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN divisions d ON t.division_id = d.id
@@ -39,6 +40,7 @@ func (r *Repository) GetPlayerByID(id int) (*models.Player, error) {
 		&p.KPercent, &p.BBPercent, &p.InZonePercent,
 		&p.WhiffPercent, &p.GroundballsPercent, &p.FlyballsPercent,
 		&p.PopupsPercent, &p.PitchHand, &p.ArmAngle,
+		&p.Height, &p.BirthCountry, &p.BirthCity,
 	)
 	if err != nil {
 		return nil, err

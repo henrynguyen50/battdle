@@ -620,10 +620,15 @@ th {
     text-align: center;
     padding: 12px 10px;
     border-bottom: 2px solid #30363d;
+    white-space: nowrap;
 }
 
 th:first-child {
     text-align: left;
+    position: sticky;
+    left: 0;
+    background-color: #161b22;
+    z-index: 2;
 }
 
 td {
@@ -631,13 +636,19 @@ td {
     border-bottom: 1px solid #21262d;
     text-align: center;
     vertical-align: middle;
+    white-space: nowrap;
 }
 
 td:first-child {
     text-align: left;
     font-weight: 600;
     color: #ffffff;
+    position: sticky;
+    left: 0;
+    background-color: #161b22;
+    z-index: 2;
 }
+
 
 /* Clue Badges */
 .badge {

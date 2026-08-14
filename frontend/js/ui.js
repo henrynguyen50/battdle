@@ -90,8 +90,11 @@ const PitchleUI = {
             tdPlayer.textContent = g.player_name;
             tr.appendChild(tdPlayer);
 
-            // Statcast Categories: team, division, age, throws, k_percent, bb_percent, whiff
-            const categories = ['team', 'division', 'age', 'throws', 'k_percent', 'bb_percent', 'whiff'];
+            // Categories: team, division, country, height, age, debut, throws, k_percent, bb_percent, whiff, in_zone, groundballs, flyballs, popups
+            const categories = [
+                'team', 'division', 'country', 'height', 'age', 'debut', 'throws',
+                'k_percent', 'bb_percent', 'whiff', 'in_zone', 'groundballs', 'flyballs', 'popups'
+            ];
             categories.forEach(cat => {
                 const td = document.createElement('td');
                 const badge = document.createElement('span');
@@ -99,7 +102,7 @@ const PitchleUI = {
                 const data = g.categories ? g.categories[cat] : null;
                 if (data && data.value !== undefined && data.value !== null) {
                     let displayVal = data.value;
-                    if (cat === 'k_percent' || cat === 'bb_percent' || cat === 'whiff') {
+                    if (['k_percent', 'bb_percent', 'whiff', 'in_zone', 'groundballs', 'flyballs', 'popups'].includes(cat)) {
                         const num = typeof displayVal === 'number' ? displayVal : parseFloat(displayVal);
                         displayVal = !isNaN(num) ? `${num.toFixed(1)}%` : `${displayVal}%`;
                     } else if (cat === 'throws') {
