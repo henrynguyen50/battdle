@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitchle — Daily MLB Pitcher Guessing Game</title>
+    <link rel="stylesheet" href="css/main.css">
+    <!-- Include Three.js from CDN -->
+    <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pitchle</h1>
+            <p class="subtitle">Daily MLB Pitcher Guessing Game</p>
+            
+            <!-- Scoreboard -->
+            <div class="scoreboard">
+                <div class="scoreboard-item">
+                    <span class="label">BALLS</span>
+                    <div class="indicators" id="balls-indicators">
+                        <span class="indicator-dot"></span>
+                        <span class="indicator-dot"></span>
+                        <span class="indicator-dot"></span>
+                    </div>
+                </div>
+                <div class="scoreboard-item">
+                    <span class="label">STRIKES</span>
+                    <div class="indicators" id="strikes-indicators">
+                        <span class="indicator-dot"></span>
+                        <span class="indicator-dot"></span>
+                        <span class="indicator-dot"></span>
+                    </div>
+                </div>
+                <div class="scoreboard-item count-display">
+                    <span class="label">COUNT</span>
+                    <span id="count-text" class="count-value">0 - 0</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- 3D Pitch Visualization Section -->
+            <section class="pitch-visualization-section">
+                <h2>Batter's Perspective</h2>
+                <div class="visualizer-container">
+                    <div id="canvas-container">
+                        <!-- Three.js Canvas will be appended here -->
+                    </div>
+                    <div class="visualizer-controls">
+                        <button id="btn-watch" class="btn btn-primary">Watch Pitch</button>
+                        <button id="btn-replay" class="btn btn-secondary" disabled>Replay</button>
+                        <div class="toggle-container">
+                            <input type="checkbox" id="toggle-slowmo">
+                            <label for="toggle-slowmo">Slow Motion</label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search Section -->
+            <section class="search-section" id="guess-input-container">
+                <h2>Make a Guess</h2>
+                <p class="search-desc">Type a pitcher's name to guess</p>
+                <div class="search-box">
+                    <input type="text" id="player-search" autocomplete="off" placeholder="Search MLB Pitchers...">
+                    <button id="btn-submit-guess" class="btn btn-success" disabled>Guess</button>
+                    <div id="autocomplete-suggestions" class="suggestions-list"></div>
+                </div>
+            </section>
+
+            <!-- Guesses Section -->
+            <section class="guesses-section">
+                <h2>Previous Guesses</h2>
+                <div class="table-container">
+                    <table id="guesses-table">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Team</th>
+                                <th>Division</th>
+                                <th>Years Played</th>
+                                <th>Position</th>
+                                <th>Year Born</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guesses-body">
+                            <!-- Guesses will be dynamically appended here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <!-- Win/Loss Modal -->
+        <div id="result-modal" class="modal">
+            <div class="modal-content">
+                <span class="modal-close" id="modal-close-btn">&times;</span>
+                <div class="modal-body">
+                    <h2 id="result-title">Game Over</h2>
+                    <p id="result-message"></p>
+                    <div id="result-details" class="answer-card">
+                        <!-- Target player details -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/guess.js"></script>
+    <script src="js/animation.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

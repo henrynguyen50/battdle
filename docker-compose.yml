@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pitchle_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pitchle
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/01_init_schema.up.sql
+      - ./database/seed/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pitchle"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    container_name: pitchle_ingestion
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/pitchle?sslmode=disable
+      SAVANT_CSV_PATH: /app/savant_data.csv
+      PLAYER_METADATA_CSV_PATH: /app/player_metadata.csv
+    depends_on:
+      db:
+        condition: service_healthy
+
+  game:
+    build:
+      context: .
+      dockerfile: services/game/Dockerfile
+    container_name: pitchle_game
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/pitchle?sslmode=disable
+      PORT: "8081"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  pitch:
+    build:
+      context: .
+      dockerfile: services/pitch/Dockerfile
+    container_name: pitchle_pitch
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/pitchle?sslmode=disable
+      PORT: "8082"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: pitchle_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      GAME_SERVICE_URL: http://game:8081
+      PITCH_SERVICE_URL: http://pitch:8082
+    depends_on:
+      - game
+      - pitch
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pitchle_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
