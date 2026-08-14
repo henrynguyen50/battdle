@@ -111,7 +111,7 @@ func main() {
 
 		if path == "/api/v1/puzzle/today/animation" {
 			pitchProxy.ServeHTTP(w, r)
-		} else if path == "/api/v1/puzzle/today" || path == "/api/v1/puzzle/today/guess" || path == "/api/v1/players/search" {
+		} else if path == "/api/v1/puzzle/today" || path == "/api/v1/puzzle/today/guess" || path == "/api/v1/puzzle/today/guess-pitch" || path == "/api/v1/players/search" || path == "/api/v1/puzzle/test/reset" || path == "/api/v1/puzzle/test/answer" || path == "/api/v1/puzzle/test/set-pitcher" {
 			gameProxy.ServeHTTP(w, r)
 		} else {
 			http.Error(w, "Not Found", http.StatusNotFound)

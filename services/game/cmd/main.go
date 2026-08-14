@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -152,6 +153,114 @@ func main() {
 		}
 
 		writeJSON(w, http.StatusOK, state)
+	})
+
+	mux.HandleFunc("POST /api/v1/puzzle/today/guess-pitch", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			writeError(w, http.StatusBadRequest, "missing X-Session-ID header")
+			return
+		}
+
+		var req struct {
+			PitchType string `json:"pitch_type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+
+		if strings.TrimSpace(req.PitchType) == "" {
+			writeError(w, http.StatusBadRequest, "pitch_type cannot be empty")
+			return
+		}
+
+		puzzle, err := puzzleSvc.GetTodayPuzzle()
+		if err != nil {
+			log.Printf("Error getting today's puzzle: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load daily puzzle")
+			return
+		}
+
+		state, err := gameSvc.SubmitPitchGuess(sessionID, puzzle, req.PitchType)
+		if err != nil {
+			log.Printf("Error submitting pitch guess: %v", err)
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	mux.HandleFunc("POST /api/v1/puzzle/test/reset", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			sessionID = "anonymous"
+		}
+
+		puzzle, err := puzzleSvc.ResetTodayPuzzleForTest(sessionID)
+		if err != nil {
+			log.Printf("Error resetting test puzzle: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to reset puzzle")
+			return
+		}
+
+		state, err := gameSvc.GetGameState(sessionID, puzzle)
+		if err != nil {
+			log.Printf("Error getting game state after reset: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load game state")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+	mux.HandleFunc("POST /api/v1/puzzle/test/set-pitcher", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			sessionID = "anonymous"
+		}
+
+		var req struct {
+			PlayerID int `json:"player_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlayerID <= 0 {
+			writeError(w, http.StatusBadRequest, "invalid player_id")
+			return
+		}
+
+		puzzle, err := puzzleSvc.SetTargetPitcherForTest(req.PlayerID, sessionID)
+		if err != nil {
+			log.Printf("Error setting test pitcher: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to set target pitcher")
+			return
+		}
+
+		state, err := gameSvc.GetGameState(sessionID, puzzle)
+		if err != nil {
+			log.Printf("Error getting game state after set pitcher: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load game state")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	mux.HandleFunc("GET /api/v1/puzzle/test/answer", func(w http.ResponseWriter, r *http.Request) {
+		puzzle, err := puzzleSvc.GetTodayPuzzle()
+		if err != nil {
+			log.Printf("Error getting today's puzzle: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load daily puzzle")
+			return
+		}
+
+		answer, err := gameSvc.GetPuzzleAnswer(puzzle)
+		if err != nil {
+			log.Printf("Error getting puzzle answer: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to load puzzle answer")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, answer)
 	})
 
 	server := &http.Server{

@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: frontend-tests
+        name: Frontend JavaScript Syntax & Kinematics Tests
+        entry: node scripts/test_frontend.js
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: postgres-tests
+        name: PostgreSQL Database & Migration Integrity Tests
+        entry: bash scripts/test_postgres.sh
+        language: system
+        files: ^(database/|services/)
+        pass_filenames: false
+
+      - id: go-tests
+        name: Go Backend Unit & Trajectory Tests
+        entry: bash scripts/run_all_tests.sh
+        language: system
+        files: \.(go|sql|js)$
+        pass_filenames: false

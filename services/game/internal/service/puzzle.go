@@ -20,11 +20,23 @@ func (s *PuzzleService) GetTodayPuzzle() (*models.DailyPuzzle, error) {
 	return s.repo.GetOrCreateDailyPuzzle(time.Now().UTC())
 }
 
+func (s *PuzzleService) ResetTodayPuzzleForTest(sessionID string) (*models.DailyPuzzle, error) {
+	return s.repo.ResetDailyPuzzleForTest(sessionID)
+}
+func (s *PuzzleService) SetTargetPitcherForTest(playerID int, sessionID string) (*models.DailyPuzzle, error) {
+	return s.repo.SetTargetPitcherForTest(playerID, sessionID)
+}
+
 type GameRepository interface {
 	GetPlayerByID(id int) (*models.Player, error)
+	GetPitchProfileByID(id int) (*models.PitchProfile, error)
+	GetPitchProfilesByPlayerID(playerID int) ([]models.PitchProfile, error)
 	GetGuessesBySessionAndPuzzle(sessionID string, puzzleID int) ([]models.Guess, error)
 	HasPlayerBeenGuessed(sessionID string, puzzleID int, playerID int) (bool, error)
 	SaveGuess(g *models.Guess) error
+	GetPitchGuessBySessionAndPuzzle(sessionID string, puzzleID int) (*models.PitchGuess, error)
+	SavePitchGuess(g *models.PitchGuess) error
+	ResetDailyPuzzleForTest(sessionID string) (*models.DailyPuzzle, error)
 }
 
 type GameService struct {

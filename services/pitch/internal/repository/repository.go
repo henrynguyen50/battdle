@@ -28,14 +28,18 @@ func (r *Repository) GetTodayPitchProfileID(date time.Time) (int, error) {
 func (r *Repository) GetPitchProfileByID(id int) (*models.PitchProfile, error) {
 	query := `
 		SELECT id, player_id, pitch_type, velocity, spin_rate, release_pos_x, release_pos_z,
-		       release_extension, break_x, break_z, arm_angle, plate_x, plate_z, created_at
+		       release_extension, break_x, break_z, arm_angle, plate_x, plate_z,
+		       COALESCE(usage_percent, 0.0), COALESCE(break_z_induced, 0.0), COALESCE(range_speed, 0.0),
+		       created_at
 		FROM pitch_profiles
 		WHERE id = $1
 	`
 	var p models.PitchProfile
 	err := r.db.QueryRow(query, id).Scan(
 		&p.ID, &p.PlayerID, &p.PitchType, &p.Velocity, &p.SpinRate, &p.ReleasePosX, &p.ReleasePosZ,
-		&p.ReleaseExtension, &p.BreakX, &p.BreakZ, &p.ArmAngle, &p.PlateX, &p.PlateZ, &p.CreatedAt,
+		&p.ReleaseExtension, &p.BreakX, &p.BreakZ, &p.ArmAngle, &p.PlateX, &p.PlateZ,
+		&p.UsagePercent, &p.BreakZInduced, &p.RangeSpeed,
+		&p.CreatedAt,
 	)
 	if err != nil {
 		return nil, err

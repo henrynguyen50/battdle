@@ -28,6 +28,15 @@ CREATE TABLE players (
     mlb_debut_year INT NOT NULL,
     mlb_last_year INT NOT NULL,
     team_id INT REFERENCES teams(id),
+    k_percent FLOAT,
+    bb_percent FLOAT,
+    in_zone_percent FLOAT,
+    whiff_percent FLOAT,
+    groundballs_percent FLOAT,
+    flyballs_percent FLOAT,
+    popups_percent FLOAT,
+    pitch_hand VARCHAR(10),
+    arm_angle FLOAT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -47,6 +56,9 @@ CREATE TABLE pitch_profiles (
     arm_angle FLOAT NOT NULL,
     plate_x FLOAT NOT NULL,
     plate_z FLOAT NOT NULL,
+    usage_percent FLOAT,
+    break_z_induced FLOAT,
+    range_speed FLOAT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -54,8 +66,8 @@ CREATE TABLE pitch_profiles (
 CREATE TABLE daily_puzzles (
     id SERIAL PRIMARY KEY,
     puzzle_date DATE NOT NULL UNIQUE,
-    target_player_id INT NOT NULL REFERENCES players(id),
-    target_pitch_profile_id INT NOT NULL REFERENCES pitch_profiles(id),
+    target_player_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    target_pitch_profile_id INT NOT NULL REFERENCES pitch_profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -63,8 +75,8 @@ CREATE TABLE daily_puzzles (
 CREATE TABLE guesses (
     id SERIAL PRIMARY KEY,
     session_id VARCHAR(64) NOT NULL,
-    puzzle_id INT NOT NULL REFERENCES daily_puzzles(id),
-    guessed_player_id INT NOT NULL REFERENCES players(id),
+    puzzle_id INT NOT NULL REFERENCES daily_puzzles(id) ON DELETE CASCADE,
+    guessed_player_id INT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
     balls INT NOT NULL,
     strikes INT NOT NULL,
     result VARCHAR(20) NOT NULL,
@@ -78,4 +90,16 @@ CREATE TABLE animations (
     pitch_profile_id INT NOT NULL UNIQUE REFERENCES pitch_profiles(id) ON DELETE CASCADE,
     animation_data JSONB NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- Create pitch_guesses table
+CREATE TABLE IF NOT EXISTS pitch_guesses (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
+    puzzle_id INT NOT NULL REFERENCES daily_puzzles(id) ON DELETE CASCADE,
+    guessed_pitch_type VARCHAR(50) NOT NULL,
+    matched BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(session_id, puzzle_id)
 );

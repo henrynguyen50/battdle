@@ -34,6 +34,12 @@ const PitchleAPI = {
     async getTodayPuzzle() {
         return apiRequest('/puzzle/today');
     },
+    async submitPitchGuess(pitchType) {
+        return apiRequest('/puzzle/today/guess-pitch', {
+            method: 'POST',
+            body: JSON.stringify({ pitch_type: pitchType }),
+        });
+    },
 
     async submitGuess(playerId) {
         return apiRequest('/puzzle/today/guess', {
@@ -41,13 +47,28 @@ const PitchleAPI = {
             body: JSON.stringify({ player_id: playerId }),
         });
     },
-
     async searchPlayers(query) {
         return apiRequest(`/players/search?q=${encodeURIComponent(query)}`);
     },
 
     async getAnimation() {
         return apiRequest('/puzzle/today/animation');
+    },
+
+    async resetPuzzleForTest() {
+        return apiRequest('/puzzle/test/reset', {
+            method: 'POST',
+        });
+    },
+
+    async getPuzzleAnswerForTest() {
+        return apiRequest('/puzzle/test/answer');
+    },
+    async setPitcherForTest(playerId) {
+        return apiRequest('/puzzle/test/set-pitcher', {
+            method: 'POST',
+            body: JSON.stringify({ player_id: playerId }),
+        });
     }
 };
 

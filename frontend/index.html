@@ -11,34 +11,45 @@
 <body>
     <div class="container">
         <header>
-            <h1>Pitchle</h1>
-            <p class="subtitle">Daily MLB Pitcher Guessing Game</p>
+            <div class="header-top">
+                <div class="header-titles">
+                    <h1>Pitchle</h1>
+                    <p class="subtitle">Daily MLB Pitcher Guessing Game</p>
+                </div>
+                <div class="header-actions">
+                    <button id="btn-test-skenes" class="btn btn-secondary btn-skenes" title="Load Paul Skenes (25.7° Arm Angle, 96.8 mph triple-digit fastball)">⚡ Paul Skenes (Test)</button>
+                    <button id="btn-test-reveal-pitcher" class="btn btn-secondary btn-reveal" title="Reveal target pitcher and pitch for testing">👀 Reveal Pitcher (Test)</button>
+                    <button id="btn-test-next-pitcher" class="btn btn-secondary btn-test" title="Get a new mystery pitcher for testing">🎲 New Pitcher (Test)</button>
+                    <button id="btn-rules" class="btn btn-rules" title="How to Play Pitchle">
+                        <span class="rules-icon">?</span> How to Play
+                    </button>
+                </div>
+            </div>
             
-            <!-- Scoreboard -->
-            <div class="scoreboard">
-                <div class="scoreboard-item">
-                    <span class="label">BALLS</span>
-                    <div class="indicators" id="balls-indicators">
-                        <span class="indicator-dot"></span>
-                        <span class="indicator-dot"></span>
-                        <span class="indicator-dot"></span>
+            <!-- In-game Test Answer Banner (Toggled with Reveal Pitcher button) -->
+            <div id="test-answer-banner" class="test-answer-banner" style="display: none;">
+                <div class="test-banner-header">
+                    <div class="test-banner-title">
+                        <span class="test-banner-icon">🧪</span>
+                        <strong>Mystery Pitcher (Test Info):</strong>
+                        <span id="test-banner-name" class="test-banner-highlight">Loading...</span>
                     </div>
+                    <button type="button" id="btn-close-test-banner" class="btn-close-banner" title="Hide test banner">&times;</button>
                 </div>
-                <div class="scoreboard-item">
-                    <span class="label">STRIKES</span>
-                    <div class="indicators" id="strikes-indicators">
-                        <span class="indicator-dot"></span>
-                        <span class="indicator-dot"></span>
-                        <span class="indicator-dot"></span>
-                    </div>
-                </div>
-                <div class="scoreboard-item count-display">
-                    <span class="label">COUNT</span>
-                    <span id="count-text" class="count-value">0 - 0</span>
+                <div class="test-banner-grid">
+                    <div><span class="test-label">Target Pitch:</span> <span id="test-banner-pitch" class="test-val highlight">--</span></div>
+                    <div><span class="test-label">2026 Team:</span> <span id="test-banner-team" class="test-val">--</span></div>
+                    <div><span class="test-label">Division:</span> <span id="test-banner-division" class="test-val">--</span></div>
+                    <div><span class="test-label">Age:</span> <span id="test-banner-age" class="test-val">--</span></div>
+                    <div><span class="test-label">Throws:</span> <span id="test-banner-throws" class="test-val">--</span></div>
+                    <div><span class="test-label">K%:</span> <span id="test-banner-kpct" class="test-val highlight">--</span></div>
+                    <div><span class="test-label">BB%:</span> <span id="test-banner-bbpct" class="test-val">--</span></div>
+                    <div><span class="test-label">Whiff%:</span> <span id="test-banner-whiff" class="test-val highlight">--</span></div>
+                    <div><span class="test-label">In-Zone%:</span> <span id="test-banner-inzone" class="test-val">--</span></div>
+                    <div><span class="test-label">Arm Angle:</span> <span id="test-banner-armangle" class="test-val">--</span></div>
                 </div>
             </div>
         </header>
-
         <main>
             <!-- 3D Pitch Visualization Section -->
             <section class="pitch-visualization-section">
@@ -48,30 +59,130 @@
                         <!-- Three.js Canvas will be appended here -->
                     </div>
                     <div class="visualizer-controls">
-                        <button id="btn-watch" class="btn btn-primary">Watch Pitch</button>
-                        <button id="btn-replay" class="btn btn-secondary" disabled>Replay</button>
-                        <div class="toggle-container">
-                            <input type="checkbox" id="toggle-slowmo">
-                            <label for="toggle-slowmo">Slow Motion</label>
+                        <div class="visualizer-main-actions">
+                            <button id="btn-watch" class="btn btn-primary">Watch Pitch</button>
+                            <button id="btn-replay" class="btn btn-secondary" disabled>Replay</button>
+                        </div>
+                        <div class="camera-toggle-group" id="camera-view-toggle">
+                            <span class="toggle-label">View:</span>
+                            <button type="button" class="btn-toggle active" data-view="rhb" id="btn-view-rhb" title="Right-Handed Batter's Perspective">RH Batter</button>
+                            <button type="button" class="btn-toggle" data-view="lhb" id="btn-view-lhb" title="Left-Handed Batter's Perspective">LH Batter</button>
+                            <button type="button" class="btn-toggle" data-view="catcher" id="btn-view-catcher" title="Catcher / Umpire Perspective">Catcher</button>
+                            <button type="button" class="btn-toggle" data-view="pitcher" id="btn-view-pitcher" title="Pitcher (Mound POV looking to Home Plate)">Pitcher (Mound)</button>
+                        </div>
+                        <div class="speed-toggle-group" id="playback-speed-toggle">
+                            <span class="toggle-label">Speed:</span>
+                            <button type="button" class="btn-toggle active" data-speed="1.0" id="btn-speed-1x" title="Normal 1.0x Speed">1.0x</button>
+                            <button type="button" class="btn-toggle" data-speed="0.5" id="btn-speed-05x" title="Slow-Motion 0.5x Speed">0.5x</button>
+                            <button type="button" class="btn-toggle" data-speed="0.25" id="btn-speed-025x" title="Super Slow-Motion 0.25x Speed">0.25x</button>
+                        </div>
+                    </div>
+            </section>
+
+            <!-- Step 1: Guess Pitch Type Section -->
+            <section class="guess-step-section" id="pitch-guess-section">
+                <div class="step-header">
+                    <span class="step-badge">Step 1</span>
+                    <h2>Guess the Pitch Type</h2>
+                </div>
+                <p class="step-desc">Watch the 3D pitch movement and select the pitch type to unlock speed & spin clues.</p>
+                
+                <div id="pitch-selector-container">
+                    <div class="pitch-chips-grid" id="pitch-chips">
+                        <button type="button" class="pitch-chip" data-pitch="Four-Seam Fastball">Four-Seam Fastball</button>
+                        <button type="button" class="pitch-chip" data-pitch="Sinker">Sinker</button>
+                        <button type="button" class="pitch-chip" data-pitch="Cutter">Cutter</button>
+                        <button type="button" class="pitch-chip" data-pitch="Slider">Slider</button>
+                        <button type="button" class="pitch-chip" data-pitch="Sweeper">Sweeper</button>
+                        <button type="button" class="pitch-chip" data-pitch="Curveball">Curveball</button>
+                        <button type="button" class="pitch-chip" data-pitch="Changeup">Changeup</button>
+                        <button type="button" class="pitch-chip" data-pitch="Splitter">Splitter</button>
+                    </div>
+                    <div class="step-actions">
+                        <button id="btn-submit-pitch-guess" class="btn btn-success" disabled>Submit Pitch Guess</button>
+                    </div>
+                </div>
+
+                <!-- Clue feedback card revealed after pitch guess -->
+                <div id="pitch-clue-card" class="pitch-clue-card" style="display: none;">
+                    <div class="clue-banner">
+                        <span id="pitch-guess-feedback-badge" class="badge"></span>
+                        <span id="pitch-guess-feedback-text" class="clue-feedback-msg"></span>
+                    </div>
+                    <div class="clue-stats-grid">
+                        <div class="clue-stat-card">
+                            <span class="stat-label">Pitch Type</span>
+                            <span id="clue-actual-type" class="stat-value">--</span>
+                        </div>
+                        <div class="clue-stat-card">
+                            <span class="stat-label">Pitch Velocity</span>
+                            <span id="clue-velocity" class="stat-value highlight">-- mph</span>
+                        </div>
+                        <div class="clue-stat-card">
+                            <span class="stat-label">Spin Rate</span>
+                            <span id="clue-spin-rate" class="stat-value highlight">-- rpm</span>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Search Section -->
-            <section class="search-section" id="guess-input-container">
-                <h2>Make a Guess</h2>
-                <p class="search-desc">Type a pitcher's name to guess</p>
+            <!-- Step 2: Guess Pitcher Section -->
+            <section class="guess-step-section" id="pitcher-guess-section">
+                <div class="step-header">
+                    <span class="step-badge">Step 2</span>
+                    <h2>Guess the Pitcher</h2>
+                </div>
+                <p class="step-desc" id="pitcher-search-desc">Guess the mystery MLB pitcher using the pitch clues and attribute feedback.</p>
                 <div class="search-box">
-                    <input type="text" id="player-search" autocomplete="off" placeholder="Search MLB Pitchers...">
-                    <button id="btn-submit-guess" class="btn btn-success" disabled>Guess</button>
+                    <input type="text" id="player-search" autocomplete="off" placeholder="Search MLB Pitchers..." disabled>
+                    <button id="btn-submit-guess" class="btn btn-success" disabled>Guess Pitcher</button>
                     <div id="autocomplete-suggestions" class="suggestions-list"></div>
+                </div>
+            </section>
+
+            <!-- Pitcher Hints & Milestones Section -->
+            <section class="hints-section" id="hints-section">
+                <div class="hints-header">
+                    <h2>Pitcher Hints & Milestones</h2>
+                    <span class="hints-sub">Unlock clues as you make guesses</span>
+                </div>
+                <div class="hints-grid">
+                    <div class="hint-card" id="hint-pitch-mix">
+                        <div class="hint-card-header">
+                            <span class="hint-icon">🎯</span>
+                            <strong>Pitch Mix (Arsenal)</strong>
+                            <span class="hint-badge" id="hint-mix-badge">3 Guesses</span>
+                        </div>
+                        <div class="hint-content" id="hint-mix-content">
+                            <span class="hint-locked">🔒 Make 3 guesses to unlock pitch arsenal</span>
+                        </div>
+                    </div>
+                    <div class="hint-card" id="hint-role">
+                        <div class="hint-card-header">
+                            <span class="hint-icon">🧢</span>
+                            <strong>Pitcher Role</strong>
+                            <span class="hint-badge" id="hint-role-badge">5 Guesses</span>
+                        </div>
+                        <div class="hint-content" id="hint-role-content">
+                            <span class="hint-locked">🔒 Make 5 guesses to unlock role</span>
+                        </div>
+                    </div>
+                    <div class="hint-card" id="hint-past-teams">
+                        <div class="hint-card-header">
+                            <span class="hint-icon">⚾</span>
+                            <strong>Career Teams</strong>
+                            <span class="hint-badge" id="hint-teams-badge">5 Guesses</span>
+                        </div>
+                        <div class="hint-content" id="hint-teams-content">
+                            <span class="hint-locked">🔒 Make 5 guesses to unlock teams</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <!-- Guesses Section -->
             <section class="guesses-section">
-                <h2>Previous Guesses</h2>
+                <h2>Previous Pitcher Guesses</h2>
                 <div class="table-container">
                     <table id="guesses-table">
                         <thead>
@@ -79,19 +190,81 @@
                                 <th>Player</th>
                                 <th>Team</th>
                                 <th>Division</th>
-                                <th>Years Played</th>
-                                <th>Position</th>
-                                <th>Year Born</th>
-                                <th>Result</th>
+                                <th>Age</th>
+                                <th>Throws</th>
+                                <th>K%</th>
+                                <th>BB%</th>
+                                <th>Whiff%</th>
                             </tr>
                         </thead>
                         <tbody id="guesses-body">
-                            <!-- Guesses will be dynamically appended here -->
+                            <!-- Guesses dynamically appended here (newest on top) -->
                         </tbody>
                     </table>
                 </div>
             </section>
         </main>
+
+        <!-- Rules Modal -->
+        <div id="rules-modal" class="modal">
+            <div class="modal-content rules-modal-content">
+                <span class="modal-close" id="rules-modal-close-btn">&times;</span>
+                <div class="modal-body">
+                    <h2>How to Play Pitchle</h2>
+                    <div class="rules-steps">
+                        <div class="rule-step">
+                            <div class="rule-icon">👀</div>
+                            <div class="rule-text">
+                                <strong>1. Watch the 3D Pitch</strong>
+                                <p>Watch the ball from the batter's perspective at home plate. Observe the movement, velocity, and break towards the strike zone.</p>
+                            </div>
+                        </div>
+                        <div class="rule-step">
+                            <div class="rule-icon">⚾</div>
+                            <div class="rule-text">
+                                <strong>2. Step 1: Guess the Pitch Type</strong>
+                                <p>Select the pitch type (e.g. Fastball, Slider, Curveball). Submitting reveals the actual pitch type along with exact velocity and spin rate clues!</p>
+                            </div>
+                        </div>
+                        <div class="rule-step">
+                            <div class="rule-icon">👤</div>
+                            <div class="rule-text">
+                                <strong>3. Step 2: Guess the Mystery MLB Pitcher</strong>
+                                <p>Search and guess active MLB pitchers. Each guess evaluates 7 Statcast categories with directional feedback:</p>
+                                <div class="rules-legend">
+                                    <span class="badge badge-match">Green</span> = Exact Match
+                                    <span class="badge badge-close" style="margin-left: 8px;">Yellow</span> = Close Match
+                                    <span class="badge badge-miss" style="margin-left: 8px;">Gray</span> = Miss
+                                </div>
+                                <div class="rules-detail-list">
+                                    <p>• <strong>Team / Division:</strong> Yellow = Same Division or League (AL/NL)</p>
+                                    <p>• <strong>Age:</strong> Yellow = Within ±2 years. Direction: ▲ (Target is older), ▼ (Target is younger)</p>
+                                    <p>• <strong>Throws:</strong> Green = Exact (R or L)</p>
+                                    <p>• <strong>K% (Strikeout Rate):</strong> Green = Within ±1.5%, Yellow = ±4.0%. ▲/▼ Direction</p>
+                                    <p>• <strong>BB% (Walk Rate):</strong> Green = Within ±1.0%, Yellow = ±2.5%. ▲/▼ Direction</p>
+                                    <p>• <strong>Whiff% (Swing & Miss):</strong> Green = Within ±1.5%, Yellow = ±4.0%. ▲/▼ Direction</p>
+                                </div>
+                        </div>
+                        <div class="rule-step">
+                            <div class="rule-icon">💡</div>
+                            <div class="rule-text">
+                                <strong>4. Milestone Hints</strong>
+                                <p>Unlock extra clues as you keep guessing: <strong>Pitch Mix (Arsenal)</strong> unlocks at 3 guesses; <strong>Pitcher Role & Career Teams</strong> unlock at 5 guesses.</p>
+                            </div>
+                        </div>
+                        <div class="rule-step">
+                            <div class="rule-icon">🏆</div>
+                            <div class="rule-text">
+                                <strong>5. Winning the Game</strong>
+                                <p>Use all your pitch and player category clues to identify the pitcher. Guess the exact player to <strong>WIN</strong>!</p>
+                            </div>
+                        </div>
+                    <div class="rules-action">
+                        <button id="btn-close-rules" class="btn btn-primary btn-play">Got It, Let's Play!</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Win/Loss Modal -->
         <div id="result-modal" class="modal">
@@ -106,13 +279,28 @@
                 </div>
             </div>
         </div>
+
+        <!-- Reveal Answer Modal (Testing) -->
+        <div id="reveal-modal" class="modal">
+            <div class="modal-content reveal-modal-content">
+                <span class="modal-close" id="reveal-modal-close-btn">&times;</span>
+                <div class="modal-body">
+                    <h2>👀 Mystery Pitcher (Test Info)</h2>
+                    <p class="reveal-sub">Here are the full details for the current mystery pitcher:</p>
+                    <div id="reveal-details" class="reveal-details-card">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
-    <script src="js/api.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/guess.js"></script>
-    <script src="js/animation.js"></script>
-    <script src="js/game.js"></script>
-</body>
+    <script src="js/api.js?v=5"></script>
+    <script src="js/ui.js?v=5"></script>
+    <script src="js/pitcher_model.js?v=5"></script>
+    <script src="js/delivery.js?v=5"></script>
+    <script src="js/animation.js?v=5"></script>
+    <script src="js/guess.js?v=5"></script>
+    <script src="js/game.js?v=5"></script>
 </html>

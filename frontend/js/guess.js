@@ -90,7 +90,7 @@ const PitchleGuess = {
         results.forEach((p, idx) => {
             const div = document.createElement('div');
             div.className = 'suggestion-item';
-            div.textContent = p.name;
+            div.innerHTML = `<strong>${p.name}</strong> <span style="color: #8b949e; font-size: 0.85rem; margin-left: 6px;">${p.team_name ? p.team_name : (p.pitch_hand ? p.pitch_hand + 'HP' : '')}</span>`;
             div.addEventListener('click', () => {
                 this.selectPlayer(p);
             });

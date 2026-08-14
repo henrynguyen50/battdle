@@ -30,11 +30,21 @@ type Player struct {
 	Weight       int        `json:"weight,omitempty" db:"weight"`
 	MLBDebutYear int        `json:"mlb_debut_year" db:"mlb_debut_year"`
 	MLBLastYear  int        `json:"mlb_last_year" db:"mlb_last_year"`
+	KPercent           float64    `json:"k_percent" db:"k_percent"`
+	BBPercent          float64    `json:"bb_percent" db:"bb_percent"`
+	InZonePercent      float64    `json:"in_zone_percent" db:"in_zone_percent"`
+	WhiffPercent       float64    `json:"whiff_percent" db:"whiff_percent"`
+	GroundballsPercent float64    `json:"groundballs_percent" db:"groundballs_percent"`
+	FlyballsPercent    float64    `json:"flyballs_percent" db:"flyballs_percent"`
+	PopupsPercent      float64    `json:"popups_percent" db:"popups_percent"`
+	PitchHand          string     `json:"pitch_hand" db:"pitch_hand"`
+	ArmAngle           float64    `json:"arm_angle" db:"arm_angle"`
 	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
 
 	DivisionID   int    `json:"division_id,omitempty" db:"division_id"`
 	DivisionName string `json:"division_name,omitempty" db:"division_name"`
+	League       string `json:"league,omitempty" db:"league"`
 	TeamID       int    `json:"team_id,omitempty" db:"team_id"`
 	TeamName     string `json:"team_name,omitempty" db:"team_name"`
 }
@@ -53,6 +63,9 @@ type PitchProfile struct {
 	ArmAngle         float64   `json:"arm_angle" db:"arm_angle"`
 	PlateX           float64   `json:"plate_x" db:"plate_x"`
 	PlateZ           float64   `json:"plate_z" db:"plate_z"`
+	UsagePercent     float64   `json:"usage_percent" db:"usage_percent"`
+	BreakZInduced    float64   `json:"break_z_induced" db:"break_z_induced"`
+	RangeSpeed       float64   `json:"range_speed" db:"range_speed"`
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 }
 
@@ -73,6 +86,15 @@ type Guess struct {
 	Strikes         int       `json:"strikes" db:"strikes"`
 	Result          string    `json:"result" db:"result"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+type PitchGuess struct {
+	ID               int       `json:"id" db:"id"`
+	SessionID        string    `json:"session_id" db:"session_id"`
+	PuzzleID         int       `json:"puzzle_id" db:"puzzle_id"`
+	GuessedPitchType string    `json:"guessed_pitch_type" db:"guessed_pitch_type"`
+	Matched          bool      `json:"matched" db:"matched"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 }
 
 type Animation struct {

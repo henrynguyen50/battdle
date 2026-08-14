@@ -37,7 +37,8 @@ type PeopleResponse struct {
 			Abbreviation string `json:"abbreviation"`
 		} `json:"primaryPosition"`
 		CurrentTeam *struct {
-			ID int `json:"id"`
+			ID          int `json:"id"`
+			ParentOrgID int `json:"parentOrgId"`
 		} `json:"currentTeam"`
 	} `json:"people"`
 }
@@ -58,7 +59,7 @@ func chunkSlice(slice []int, chunkSize int) [][]int {
 func FetchAllPlayerMetadata(playerIDs []int, teamMap map[int]int) (map[int]models.Player, error) {
 	cache := make(map[int]models.Player)
 	chunks := chunkSlice(playerIDs, 100)
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	for _, chunk := range chunks {
 		var idStrs []string
@@ -68,11 +69,21 @@ func FetchAllPlayerMetadata(playerIDs []int, teamMap map[int]int) (map[int]model
 		personIDsParam := strings.Join(idStrs, ",")
 
 		url := fmt.Sprintf("https://statsapi.mlb.com/api/v1/people?personIds=%s&hydrate=currentTeam", personIDsParam)
-		resp, err := client.Get(url)
+		var resp *http.Response
+		var err error
+		for retry := range 3 {
+			resp, err = client.Get(url)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				break
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+			time.Sleep(time.Duration(retry+1) * 500 * time.Millisecond)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("http request failed for chunk: %w", err)
 		}
-
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -127,11 +138,15 @@ func FetchAllPlayerMetadata(playerIDs []int, teamMap map[int]int) (map[int]model
 				pos = "P"
 			}
 
-			// Parse team ID
+			// Parse team ID (resolve direct MLB team ID or minor league parentOrgId)
 			var dbTeamID int
 			if p.CurrentTeam != nil {
 				if id, ok := teamMap[p.CurrentTeam.ID]; ok {
 					dbTeamID = id
+				} else if p.CurrentTeam.ParentOrgID != 0 {
+					if id, ok := teamMap[p.CurrentTeam.ParentOrgID]; ok {
+						dbTeamID = id
+					}
 				}
 			}
 
@@ -140,7 +155,6 @@ func FetchAllPlayerMetadata(playerIDs []int, teamMap map[int]int) (map[int]model
 				mlbTeamID := MLBTeamIDs[p.ID%len(MLBTeamIDs)]
 				dbTeamID = teamMap[mlbTeamID]
 			}
-
 			cache[p.ID] = models.Player{
 				MLBID:        p.ID,
 				BirthDate:    birthDate,

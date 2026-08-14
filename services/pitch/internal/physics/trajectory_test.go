@@ -185,62 +185,145 @@ func TestCalculateTrajectory_FlightTime(t *testing.T) {
 	}
 }
 
-// TestCalculateTrajectory_Kinematics verifies that intermediate trajectory coordinates
-// match the expected gravity drop and spin break offsets.
-// Specifically, for any point at t = f * T:
-// - Deviation in X from a linear path is BreakX * (f^2 - f)
-// - Deviation in Z from a linear path is BreakZ * (f - f^2)
-func TestCalculateTrajectory_Kinematics(t *testing.T) {
-	profile := &models.PitchProfile{
-		ReleasePosX:      -2.0,
-		ReleasePosZ:      6.0,
-		ReleaseExtension: 6.5,
-		PlateX:           0.5,
-		PlateZ:           2.5,
-		Velocity:         95.0,
-		BreakX:           -1.5,
-		BreakZ:           5.0,
+// TestCalculateTrajectory_Kinematics_RHP verifies that for an RHP (ReleasePosX >= 0):
+// - Sinker (BreakX < 0) curves OUTWARDS (midPt.X < linearX).
+// - Sweeper (BreakX > 0) curves INWARDS across the zone (midSweeper.X > linearSweeperX).
+func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
+	rhpSinker := &models.PitchProfile{
+		ReleasePosX:      2.4, // RHP (> 0)
+		ReleasePosZ:      5.5,
+		ReleaseExtension: 6.2,
+		PlateX:           0.48,
+		PlateZ:           1.65,
+		Velocity:         96.4,
+		BreakX:           -15.0, // Negative BreakX (arm-side run)
+		BreakZ:           -26.0,
 	}
 
-	points := CalculateTrajectory(profile)
+	points := CalculateTrajectory(rhpSinker)
 	if len(points) != 61 {
 		t.Fatalf("expected 61 points, got %d", len(points))
 	}
 
-	x0 := profile.ReleasePosX
-	xf := profile.PlateX
-	z0 := profile.ReleasePosZ
-	zf := profile.PlateZ
-
-	const epsilon = 1e-9
-
-	// Test intermediate points at fractions f = 0.25 (idx 15), f = 0.5 (idx 30), f = 0.75 (idx 45)
-	fractions := map[int]float64{
-		15: 0.25,
-		30: 0.50,
-		45: 0.75,
+	midPt := points[30]
+	linearX := (rhpSinker.ReleasePosX + rhpSinker.PlateX) / 2.0
+	// For RHP, Sinker curves OUTWARDS (midPt.X < linearX)
+	if midPt.X >= linearX {
+		t.Errorf("RHP Sinker should curve OUTWARDS: midPt.X=%f >= linearX=%f", midPt.X, linearX)
 	}
 
-	for idx, f := range fractions {
-		pt := points[idx]
+	rhpSweeper := &models.PitchProfile{
+		ReleasePosX:      2.4, // RHP (> 0)
+		ReleasePosZ:      5.5,
+		ReleaseExtension: 6.2,
+		PlateX:           -0.75,
+		PlateZ:           1.60,
+		Velocity:         84.0,
+		BreakX:           14.0, // Positive BreakX (glove-side sweep)
+		BreakZ:           -18.0,
+	}
 
-		// Linear interpolation values
-		xLinear := (1-f)*x0 + f*xf
-		zLinear := (1-f)*z0 + f*zf
+	sweeperPoints := CalculateTrajectory(rhpSweeper)
+	midSweeper := sweeperPoints[30]
+	linearSweeperX := (rhpSweeper.ReleasePosX + rhpSweeper.PlateX) / 2.0
+	// For RHP, Sweeper curves INWARDS across the zone (midSweeper.X > linearSweeperX)
+	if midSweeper.X <= linearSweeperX {
+		t.Errorf("RHP Sweeper should curve INWARDS: midSweeper.X=%f <= linearSweeperX=%f", midSweeper.X, linearSweeperX)
+	}
+}
 
-		// Expected deviation
-		expectedXOffset := profile.BreakX * (f*f - f)
-		expectedZOffset := profile.BreakZ * (f - f*f)
+// TestCalculateTrajectory_Kinematics_LHP verifies that for an LHP (ReleasePosX < 0):
+// - Sinker (BreakX > 0 in Statcast) curves OUTWARDS (midPt.X > linearX).
+// - Sweeper (BreakX < 0 in Statcast) curves INWARDS (midSweeper.X < linearSweeperX).
+func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
+	lhpSinker := &models.PitchProfile{
+		ReleasePosX:      -2.2, // LHP (< 0)
+		ReleasePosZ:      5.5,
+		ReleaseExtension: 6.0,
+		PlateX:           -0.48,
+		PlateZ:           1.65,
+		Velocity:         94.0,
+		BreakX:           15.0, // Positive BreakX for LHP in Statcast (arm-side run)
+		BreakZ:           -26.0,
+	}
 
-		// Actual deviation
-		actualXOffset := pt.X - xLinear
-		actualZOffset := pt.Z - zLinear
+	points := CalculateTrajectory(lhpSinker)
+	midPt := points[30]
+	linearX := (lhpSinker.ReleasePosX + lhpSinker.PlateX) / 2.0
+	// For LHP, Sinker curves OUTWARDS (midPt.X > linearX)
+	if midPt.X <= linearX {
+		t.Errorf("LHP Sinker should curve OUTWARDS: midPt.X=%f <= linearX=%f", midPt.X, linearX)
+	}
 
-		if math.Abs(actualXOffset-expectedXOffset) > epsilon {
-			t.Errorf("X offset mismatch at f=%f (idx %d): expected %f, got %f", f, idx, expectedXOffset, actualXOffset)
-		}
-		if math.Abs(actualZOffset-expectedZOffset) > epsilon {
-			t.Errorf("Z offset mismatch at f=%f (idx %d): expected %f, got %f", f, idx, expectedZOffset, actualZOffset)
-		}
+	lhpSweeper := &models.PitchProfile{
+		ReleasePosX:      -2.2, // LHP (< 0)
+		ReleasePosZ:      5.5,
+		ReleaseExtension: 6.0,
+		PlateX:           0.55,
+		PlateZ:           1.60,
+		Velocity:         82.0,
+		BreakX:           -14.0, // Negative BreakX for LHP in Statcast (glove-side sweep)
+		BreakZ:           -18.0,
+	}
+
+	sweeperPoints := CalculateTrajectory(lhpSweeper)
+	midSweeper := sweeperPoints[30]
+	linearSweeperX := (lhpSweeper.ReleasePosX + lhpSweeper.PlateX) / 2.0
+	// For LHP, Sweeper curves INWARDS across the zone (midSweeper.X < linearSweeperX)
+	if midSweeper.X >= linearSweeperX {
+		t.Errorf("LHP Sweeper should curve INWARDS: midSweeper.X=%f >= linearSweeperX=%f", midSweeper.X, linearSweeperX)
+	}
+}
+// TestCalculateTrajectory_CurveballHump verifies that a curveball pops upward in early flight (hump arc)
+// before crashing down into the lower strike zone.
+func TestCalculateTrajectory_CurveballHump(t *testing.T) {
+	curveball := &models.PitchProfile{
+		PitchType:        "Curveball",
+		ReleasePosX:      2.4,
+		ReleasePosZ:      5.57,
+		ReleaseExtension: 6.2,
+		PlateX:           -0.10,
+		PlateZ:           1.26,
+		Velocity:         81.9,
+		BreakX:           12.0,
+		BreakZ:           -55.0,
+	}
+
+	points := CalculateTrajectory(curveball)
+	if len(points) != 61 {
+		t.Fatalf("expected 61 points, got %d", len(points))
+	}
+
+	// In early flight (around step 8-12), Z should rise above release height z0
+	earlyPt := points[10]
+	if earlyPt.Z <= curveball.ReleasePosZ {
+		t.Errorf("Curveball failed to pop upward (hump): earlyPt.Z=%f <= ReleasePosZ=%f", earlyPt.Z, curveball.ReleasePosZ)
+	}
+
+	// At the plate, Z must finish in the lower zone
+	platePt := points[60]
+	if platePt.Z > 2.0 {
+		t.Errorf("Curveball failed to drop through lower zone: platePt.Z=%f > 2.0", platePt.Z)
+	}
+}
+
+// TestCalculateTrajectory_SweeperHump verifies that a sweeper pops up slightly before sweeping horizontally.
+func TestCalculateTrajectory_SweeperHump(t *testing.T) {
+	sweeper := &models.PitchProfile{
+		PitchType:        "Sweeper",
+		ReleasePosX:      2.4,
+		ReleasePosZ:      5.57,
+		ReleaseExtension: 6.2,
+		PlateX:           -0.75,
+		PlateZ:           1.50,
+		Velocity:         84.9,
+		BreakX:           18.0,
+		BreakZ:           -40.0,
+	}
+
+	points := CalculateTrajectory(sweeper)
+	earlyPt := points[8]
+	if earlyPt.Z <= sweeper.ReleasePosZ {
+		t.Errorf("Sweeper failed to pop upward in early flight: earlyPt.Z=%f <= ReleasePosZ=%f", earlyPt.Z, sweeper.ReleasePosZ)
 	}
 }

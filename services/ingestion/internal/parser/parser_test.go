@@ -380,3 +380,49 @@ not-an-int,John Doe,2200.5,95.2,6.5,8.2,-12.4,-1.8,6.1,0.2,2.5,45.0
 		}
 	})
 }
+
+func TestParseUpdatedCSV_Success(t *testing.T) {
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "updated.csv")
+
+	csvContent := "\xef\xbb\xbf\"last_name, first_name\",\"player_id\",\"year\",\"player_age\",\"k_percent\",\"bb_percent\",\"in_zone_percent\",\"whiff_percent\",\"groundballs_percent\",\"flyballs_percent\",\"popups_percent\",\"pitch_hand\",\"arm_angle\",\"n_ff_formatted\",\"ff_avg_speed\",\"ff_avg_spin\",\"ff_avg_break_x\",\"ff_avg_break_z\",\"ff_avg_break_z_induced\",\"ff_avg_break\",\"ff_range_speed\",\"n_si_formatted\",\"si_avg_speed\",\"si_avg_spin\",\"si_avg_break_x\",\"si_avg_break_z\",\"si_avg_break_z_induced\",\"si_avg_break\",\"si_range_speed\"\n\"Webb, Logan\",657277,2026,29,19.1,5.9,46.5,20.5,52.5,19.2,4.8,\"R\",20.9,\"12.7\",\"92.3\",\"2084\",\"-7.7\",\"-22\",\"9.9\",\"12.7\",\"1.1\",\"29.7\",\"92.1\",\"1946\",\"-15.5\",\"-32\",\"0.3\",\"15.7\",\"1.1\"\n"
+	if err := os.WriteFile(tempFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp CSV file: %v", err)
+	}
+
+	records, err := ParseUpdatedCSV(tempFile)
+	if err != nil {
+		t.Fatalf("ParseUpdatedCSV returned unexpected error: %v", err)
+	}
+
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+
+	p := records[0]
+	if p.PlayerID != 657277 {
+		t.Errorf("expected PlayerID 657277, got %d", p.PlayerID)
+	}
+	if p.NormalizedName != "Logan Webb" {
+		t.Errorf("expected NormalizedName 'Logan Webb', got '%s'", p.NormalizedName)
+	}
+	if p.PlayerAge != 29 {
+		t.Errorf("expected PlayerAge 29, got %d", p.PlayerAge)
+	}
+	if p.KPercent != 19.1 {
+		t.Errorf("expected KPercent 19.1, got %f", p.KPercent)
+	}
+	if p.PitchHand != "R" {
+		t.Errorf("expected PitchHand 'R', got '%s'", p.PitchHand)
+	}
+	if len(p.Pitches) != 2 {
+		t.Fatalf("expected 2 pitches, got %d", len(p.Pitches))
+	}
+	// Pitches sorted descending by usage: Sinker (29.7%) then Four-Seam Fastball (12.7%)
+	if p.Pitches[0].PitchType != "Sinker" || p.Pitches[0].UsagePercent != 29.7 {
+		t.Errorf("expected primary pitch Sinker with 29.7%% usage, got %s with %f%%", p.Pitches[0].PitchType, p.Pitches[0].UsagePercent)
+	}
+	if p.Pitches[1].PitchType != "Four-Seam Fastball" || p.Pitches[1].UsagePercent != 12.7 {
+		t.Errorf("expected second pitch Four-Seam Fastball with 12.7%% usage, got %s with %f%%", p.Pitches[1].PitchType, p.Pitches[1].UsagePercent)
+	}
+}

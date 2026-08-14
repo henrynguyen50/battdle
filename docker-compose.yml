@@ -27,6 +27,7 @@ services:
     container_name: pitchle_ingestion
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/pitchle?sslmode=disable
+      UPDATED_CSV_PATH: /app/updated1.csv
       SAVANT_CSV_PATH: /app/savant_data.csv
       PLAYER_METADATA_CSV_PATH: /app/player_metadata.csv
     depends_on:

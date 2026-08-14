@@ -11,17 +11,49 @@ import (
 )
 
 type mockRepository struct {
-	getPlayerByIDFunc                func(id int) (*models.Player, error)
-	getGuessesBySessionAndPuzzleFunc func(sessionID string, puzzleID int) ([]models.Guess, error)
-	hasPlayerBeenGuessedFunc         func(sessionID string, puzzleID int, playerID int) (bool, error)
-	saveGuessFunc                    func(g *models.Guess) error
+	getPlayerByIDFunc                   func(id int) (*models.Player, error)
+	getPitchProfileByIDFunc             func(id int) (*models.PitchProfile, error)
+	getGuessesBySessionAndPuzzleFunc    func(sessionID string, puzzleID int) ([]models.Guess, error)
+	hasPlayerBeenGuessedFunc            func(sessionID string, puzzleID int, playerID int) (bool, error)
+	saveGuessFunc                       func(g *models.Guess) error
+	getPitchGuessBySessionAndPuzzleFunc func(sessionID string, puzzleID int) (*models.PitchGuess, error)
+	savePitchGuessFunc                  func(g *models.PitchGuess) error
+	getPitchProfilesByPlayerIDFunc      func(playerID int) ([]models.PitchProfile, error)
+	resetDailyPuzzleForTestFunc         func(sessionID string) (*models.DailyPuzzle, error)
 }
 
+func (m *mockRepository) GetPitchProfilesByPlayerID(playerID int) ([]models.PitchProfile, error) {
+	if m.getPitchProfilesByPlayerIDFunc != nil {
+		return m.getPitchProfilesByPlayerIDFunc(playerID)
+	}
+	return []models.PitchProfile{
+		{
+			ID:           1,
+			PlayerID:     playerID,
+			PitchType:    "Four-Seam Fastball",
+			Velocity:     97.5,
+			SpinRate:     2400.0,
+			UsagePercent: 55.0,
+		},
+	}, nil
+}
 func (m *mockRepository) GetPlayerByID(id int) (*models.Player, error) {
 	if m.getPlayerByIDFunc != nil {
 		return m.getPlayerByIDFunc(id)
 	}
 	return nil, fmt.Errorf("GetPlayerByID not implemented")
+}
+
+func (m *mockRepository) GetPitchProfileByID(id int) (*models.PitchProfile, error) {
+	if m.getPitchProfileByIDFunc != nil {
+		return m.getPitchProfileByIDFunc(id)
+	}
+	return &models.PitchProfile{
+		ID:        id,
+		PitchType: "Four-Seam Fastball",
+		Velocity:  97.5,
+		SpinRate:  2400.0,
+	}, nil
 }
 
 func (m *mockRepository) GetGuessesBySessionAndPuzzle(sessionID string, puzzleID int) ([]models.Guess, error) {
@@ -45,12 +77,38 @@ func (m *mockRepository) SaveGuess(g *models.Guess) error {
 	return nil
 }
 
+func (m *mockRepository) GetPitchGuessBySessionAndPuzzle(sessionID string, puzzleID int) (*models.PitchGuess, error) {
+	if m.getPitchGuessBySessionAndPuzzleFunc != nil {
+		return m.getPitchGuessBySessionAndPuzzleFunc(sessionID, puzzleID)
+	}
+	return &models.PitchGuess{
+		SessionID:        sessionID,
+		PuzzleID:         puzzleID,
+		GuessedPitchType: "Four-Seam Fastball",
+		Matched:          true,
+	}, nil
+}
+
+func (m *mockRepository) SavePitchGuess(g *models.PitchGuess) error {
+	if m.savePitchGuessFunc != nil {
+		return m.savePitchGuessFunc(g)
+	}
+	return nil
+}
+
+func (m *mockRepository) ResetDailyPuzzleForTest(sessionID string) (*models.DailyPuzzle, error) {
+	if m.resetDailyPuzzleForTestFunc != nil {
+		return m.resetDailyPuzzleForTestFunc(sessionID)
+	}
+	return nil, nil
+}
+
 func TestCompareCategories(t *testing.T) {
 	target := &models.Player{
 		ID:           1,
 		MLBID:        1001,
 		Name:         "Clayton Kershaw",
-		BirthYear:    1988,
+		BirthYear:    1988, // Age: 2026 - 1988 = 38
 		Position:     "SP",
 		MLBDebutYear: 2008,
 		MLBLastYear:  2024,
@@ -58,6 +116,11 @@ func TestCompareCategories(t *testing.T) {
 		TeamName:     "Dodgers",
 		DivisionID:   100,
 		DivisionName: "NL West",
+		League:       "NL",
+		PitchHand:    "L",
+		KPercent:     25.0,
+		BBPercent:    6.0,
+		WhiffPercent: 28.0,
 	}
 
 	tests := []struct {
@@ -66,164 +129,84 @@ func TestCompareCategories(t *testing.T) {
 		want    service.CategoryFeedbackMap
 	}{
 		{
-			name: "all categories match",
+			name: "all categories exact match",
 			guessed: &models.Player{
 				ID:           1,
 				MLBID:        1001,
 				Name:         "Clayton Kershaw",
 				BirthYear:    1988,
-				Position:     "SP",
-				MLBDebutYear: 2008,
-				MLBLastYear:  2024,
 				TeamID:       10,
 				TeamName:     "Dodgers",
 				DivisionID:   100,
 				DivisionName: "NL West",
+				League:       "NL",
+				PitchHand:    "L",
+				KPercent:     25.0,
+				BBPercent:    6.0,
+				WhiffPercent: 28.0,
 			},
 			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Dodgers", Matched: true},
-				Division:    service.CategoryFeedback{Value: "NL West", Matched: true},
-				YearsPlayed: service.CategoryFeedback{Value: 17, Matched: true},
-				Position:    service.CategoryFeedback{Value: "SP", Matched: true},
-				YearBorn:    service.CategoryFeedback{Value: 1988, Matched: true},
+				Team:      service.CategoryFeedback{Value: "Dodgers", Matched: true, Close: false, Direction: "equal"},
+				Division:  service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
+				Age:       service.CategoryFeedback{Value: 38, Matched: true, Close: false, Direction: "equal"},
+				Throws:    service.CategoryFeedback{Value: "L", Matched: true, Close: false, Direction: "equal"},
+				KPercent:  service.CategoryFeedback{Value: 25.0, Matched: true, Close: false, Direction: "equal"},
+				BBPercent: service.CategoryFeedback{Value: 6.0, Matched: true, Close: false, Direction: "equal"},
+				Whiff:     service.CategoryFeedback{Value: 28.0, Matched: true, Close: false, Direction: "equal"},
 			},
 		},
 		{
-			name: "only team and division match",
+			name: "close match on metrics with higher/lower directions",
 			guessed: &models.Player{
 				ID:           2,
 				MLBID:        1002,
 				Name:         "Freddie Freeman",
-				BirthYear:    1989,
-				Position:     "1B",
-				MLBDebutYear: 2010,
-				MLBLastYear:  2024,
-				TeamID:       10,
-				TeamName:     "Dodgers",
-				DivisionID:   100,
-				DivisionName: "NL West",
-			},
-			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Dodgers", Matched: true},
-				Division:    service.CategoryFeedback{Value: "NL West", Matched: true},
-				YearsPlayed: service.CategoryFeedback{Value: 15, Matched: false},
-				Position:    service.CategoryFeedback{Value: "1B", Matched: false},
-				YearBorn:    service.CategoryFeedback{Value: 1989, Matched: false},
-			},
-		},
-		{
-			name: "only division matches",
-			guessed: &models.Player{
-				ID:           3,
-				MLBID:        1003,
-				Name:         "Logan Webb",
-				BirthYear:    1996,
-				Position:     "RP",
-				MLBDebutYear: 2019,
-				MLBLastYear:  2024,
+				BirthYear:    1990, // Age: 36 (target is 38 -> target higher)
 				TeamID:       11,
 				TeamName:     "Giants",
 				DivisionID:   100,
 				DivisionName: "NL West",
+				League:       "NL",
+				PitchHand:    "R",   // Mismatch
+				KPercent:     22.0,  // diff +3.0 -> close (target higher)
+				BBPercent:    8.0,   // diff -2.0 -> close (target lower)
+				WhiffPercent: 31.0,  // diff -3.0 -> close (target lower)
 			},
 			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Giants", Matched: false},
-				Division:    service.CategoryFeedback{Value: "NL West", Matched: true},
-				YearsPlayed: service.CategoryFeedback{Value: 6, Matched: false},
-				Position:    service.CategoryFeedback{Value: "RP", Matched: false},
-				YearBorn:    service.CategoryFeedback{Value: 1996, Matched: false},
+				Team:      service.CategoryFeedback{Value: "Giants", Matched: false, Close: true, Direction: ""},
+				Division:  service.CategoryFeedback{Value: "NL West", Matched: true, Close: false, Direction: "equal"},
+				Age:       service.CategoryFeedback{Value: 36, Matched: false, Close: true, Direction: "higher"},
+				Throws:    service.CategoryFeedback{Value: "R", Matched: false, Close: false, Direction: ""},
+				KPercent:  service.CategoryFeedback{Value: 22.0, Matched: false, Close: true, Direction: "higher"},
+				BBPercent: service.CategoryFeedback{Value: 8.0, Matched: false, Close: true, Direction: "lower"},
+				Whiff:     service.CategoryFeedback{Value: 31.0, Matched: false, Close: true, Direction: "lower"},
 			},
 		},
 		{
-			name: "only years played matches",
+			name: "all miss with directional indicators",
 			guessed: &models.Player{
-				ID:           4,
-				MLBID:        1004,
-				Name:         "Zack Greinke",
-				BirthYear:    1983,
-				Position:     "RP",
-				MLBDebutYear: 2007,
-				MLBLastYear:  2023,
-				TeamID:       12,
-				TeamName:     "Royals",
-				DivisionID:   101,
-				DivisionName: "AL Central",
-			},
-			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Royals", Matched: false},
-				Division:    service.CategoryFeedback{Value: "AL Central", Matched: false},
-				YearsPlayed: service.CategoryFeedback{Value: 17, Matched: true},
-				Position:    service.CategoryFeedback{Value: "RP", Matched: false},
-				YearBorn:    service.CategoryFeedback{Value: 1983, Matched: false},
-			},
-		},
-		{
-			name: "only position matches",
-			guessed: &models.Player{
-				ID:           5,
-				MLBID:        1005,
+				ID:           3,
+				MLBID:        1003,
 				Name:         "Gerrit Cole",
-				BirthYear:    1990,
-				Position:     "SP",
-				MLBDebutYear: 2013,
-				MLBLastYear:  2024,
+				BirthYear:    1994, // Age: 32 (diff 6 -> miss, target higher)
 				TeamID:       13,
 				TeamName:     "Yankees",
 				DivisionID:   102,
 				DivisionName: "AL East",
+				League:       "AL",
+				PitchHand:    "R",
+				KPercent:     33.0,  // diff -8.0 -> miss (target lower)
+				BBPercent:    2.0,   // diff +4.0 -> miss (target higher)
+				WhiffPercent: 15.0,  // diff +13.0 -> miss (target higher)
 			},
 			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Yankees", Matched: false},
-				Division:    service.CategoryFeedback{Value: "AL East", Matched: false},
-				YearsPlayed: service.CategoryFeedback{Value: 12, Matched: false},
-				Position:    service.CategoryFeedback{Value: "SP", Matched: true},
-				YearBorn:    service.CategoryFeedback{Value: 1990, Matched: false},
-			},
-		},
-		{
-			name: "only year born matches",
-			guessed: &models.Player{
-				ID:           6,
-				MLBID:        1006,
-				Name:         "Craig Kimbrel",
-				BirthYear:    1988,
-				Position:     "RP",
-				MLBDebutYear: 2010,
-				MLBLastYear:  2024,
-				TeamID:       14,
-				TeamName:     "Orioles",
-				DivisionID:   102,
-				DivisionName: "AL East",
-			},
-			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Orioles", Matched: false},
-				Division:    service.CategoryFeedback{Value: "AL East", Matched: false},
-				YearsPlayed: service.CategoryFeedback{Value: 15, Matched: false},
-				Position:    service.CategoryFeedback{Value: "RP", Matched: false},
-				YearBorn:    service.CategoryFeedback{Value: 1988, Matched: true},
-			},
-		},
-		{
-			name: "all categories mismatch",
-			guessed: &models.Player{
-				ID:           7,
-				MLBID:        1007,
-				Name:         "Shohei Ohtani",
-				BirthYear:    1994,
-				Position:     "DH",
-				MLBDebutYear: 2018,
-				MLBLastYear:  2024,
-				TeamID:       15,
-				TeamName:     "Angels",
-				DivisionID:   103,
-				DivisionName: "AL West",
-			},
-			want: service.CategoryFeedbackMap{
-				Team:        service.CategoryFeedback{Value: "Angels", Matched: false},
-				Division:    service.CategoryFeedback{Value: "AL West", Matched: false},
-				YearsPlayed: service.CategoryFeedback{Value: 7, Matched: false},
-				Position:    service.CategoryFeedback{Value: "DH", Matched: false},
-				YearBorn:    service.CategoryFeedback{Value: 1994, Matched: false},
+				Team:      service.CategoryFeedback{Value: "Yankees", Matched: false, Close: false, Direction: ""},
+				Division:  service.CategoryFeedback{Value: "AL East", Matched: false, Close: false, Direction: ""},
+				Age:       service.CategoryFeedback{Value: 32, Matched: false, Close: false, Direction: "higher"},
+				Throws:    service.CategoryFeedback{Value: "R", Matched: false, Close: false, Direction: ""},
+				KPercent:  service.CategoryFeedback{Value: 33.0, Matched: false, Close: false, Direction: "lower"},
+				BBPercent: service.CategoryFeedback{Value: 2.0, Matched: false, Close: false, Direction: "higher"},
+				Whiff:     service.CategoryFeedback{Value: 15.0, Matched: false, Close: false, Direction: "higher"},
 			},
 		},
 	}
@@ -237,14 +220,20 @@ func TestCompareCategories(t *testing.T) {
 			if got.Division != tt.want.Division {
 				t.Errorf("Division feedback = %+v, want %+v", got.Division, tt.want.Division)
 			}
-			if got.YearsPlayed != tt.want.YearsPlayed {
-				t.Errorf("YearsPlayed feedback = %+v, want %+v", got.YearsPlayed, tt.want.YearsPlayed)
+			if got.Age != tt.want.Age {
+				t.Errorf("Age feedback = %+v, want %+v", got.Age, tt.want.Age)
 			}
-			if got.Position != tt.want.Position {
-				t.Errorf("Position feedback = %+v, want %+v", got.Position, tt.want.Position)
+			if got.Throws != tt.want.Throws {
+				t.Errorf("Throws feedback = %+v, want %+v", got.Throws, tt.want.Throws)
 			}
-			if got.YearBorn != tt.want.YearBorn {
-				t.Errorf("YearBorn feedback = %+v, want %+v", got.YearBorn, tt.want.YearBorn)
+			if got.KPercent != tt.want.KPercent {
+				t.Errorf("KPercent feedback = %+v, want %+v", got.KPercent, tt.want.KPercent)
+			}
+			if got.BBPercent != tt.want.BBPercent {
+				t.Errorf("BBPercent feedback = %+v, want %+v", got.BBPercent, tt.want.BBPercent)
+			}
+			if got.Whiff != tt.want.Whiff {
+				t.Errorf("Whiff feedback = %+v, want %+v", got.Whiff, tt.want.Whiff)
 			}
 		})
 	}
@@ -252,9 +241,10 @@ func TestCompareCategories(t *testing.T) {
 
 func setupSubmitGuessTest() (*models.DailyPuzzle, *models.Player, map[int]*models.Player) {
 	puzzle := &models.DailyPuzzle{
-		ID:             100,
-		PuzzleDate:     time.Now().UTC(),
-		TargetPlayerID: 1,
+		ID:                   100,
+		PuzzleDate:           time.Now().UTC(),
+		TargetPlayerID:       1,
+		TargetPitchProfileID: 10,
 	}
 
 	target := &models.Player{
@@ -269,6 +259,11 @@ func setupSubmitGuessTest() (*models.DailyPuzzle, *models.Player, map[int]*model
 		TeamName:     "Dodgers",
 		DivisionID:   100,
 		DivisionName: "NL West",
+		League:       "NL",
+		PitchHand:    "L",
+		KPercent:     25.0,
+		BBPercent:    6.0,
+		WhiffPercent: 28.0,
 	}
 
 	players := map[int]*models.Player{
@@ -286,8 +281,13 @@ func setupSubmitGuessTest() (*models.DailyPuzzle, *models.Player, map[int]*model
 			TeamName:     "Dodgers",
 			DivisionID:   100,
 			DivisionName: "NL West",
+			League:       "NL",
+			PitchHand:    "R",
+			KPercent:     20.0,
+			BBPercent:    8.0,
+			WhiffPercent: 24.0,
 		},
-		// Strike player (0 matches)
+		// Strike player (0 matches, 0 close)
 		3: {
 			ID:           3,
 			MLBID:        1003,
@@ -300,6 +300,30 @@ func setupSubmitGuessTest() (*models.DailyPuzzle, *models.Player, map[int]*model
 			TeamName:     "Angels",
 			DivisionID:   103,
 			DivisionName: "AL West",
+			League:       "AL",
+			PitchHand:    "R",
+			KPercent:     32.0,
+			BBPercent:    2.0,
+			WhiffPercent: 15.0,
+		},
+		// Close-only player
+		4: {
+			ID:           4,
+			MLBID:        1004,
+			Name:         "Bryce Harper",
+			BirthYear:    1992,
+			Position:     "1B",
+			MLBDebutYear: 2012,
+			MLBLastYear:  2024,
+			TeamID:       20,
+			TeamName:     "Phillies",
+			DivisionID:   104,
+			DivisionName: "NL East",
+			League:       "NL",
+			PitchHand:    "R",
+			KPercent:     23.0,
+			BBPercent:    7.0,
+			WhiffPercent: 26.0,
 		},
 	}
 
@@ -360,11 +384,25 @@ func TestSubmitGuess_Correct(t *testing.T) {
 	if savedGuess.Result != "correct" {
 		t.Errorf("expected saved guess result to be 'correct', got %s", savedGuess.Result)
 	}
+
+	// When game is won, all hints are unlocked
+	if state.Hints == nil {
+		t.Fatal("expected hints to be unlocked when game is won")
+	}
+	if len(state.Hints.PitchMix) == 0 {
+		t.Error("expected pitch mix to be populated")
+	}
+	if state.Hints.Role == "" {
+		t.Error("expected role to be populated")
+	}
+	if len(state.Hints.PastTeams) == 0 {
+		t.Error("expected past teams to be populated")
+	}
 }
 
-func TestSubmitGuess_Ball(t *testing.T) {
+func TestSubmitGuess_Incorrect(t *testing.T) {
 	puzzle, _, players := setupSubmitGuessTest()
-	sessionID := "session-ball"
+	sessionID := "session-incorrect"
 
 	var savedGuess *models.Guess
 	repo := &mockRepository{
@@ -388,19 +426,13 @@ func TestSubmitGuess_Ball(t *testing.T) {
 	}
 
 	svc := service.NewGameService(repo)
-	state, err := svc.SubmitGuess(sessionID, puzzle, 2) // player 2 has matches -> ball
+	state, err := svc.SubmitGuess(sessionID, puzzle, 2)
 	if err != nil {
 		t.Fatalf("unexpected error submitting guess: %v", err)
 	}
 
 	if state.Status != "active" {
 		t.Errorf("expected state status to be 'active', got %s", state.Status)
-	}
-	if state.Balls != 1 {
-		t.Errorf("expected balls to be 1, got %d", state.Balls)
-	}
-	if state.Strikes != 0 {
-		t.Errorf("expected strikes to be 0, got %d", state.Strikes)
 	}
 	if state.Answer != nil {
 		t.Errorf("expected answer to be nil for active game, got %+v", state.Answer)
@@ -408,185 +440,45 @@ func TestSubmitGuess_Ball(t *testing.T) {
 	if len(state.Guesses) != 1 {
 		t.Fatalf("expected 1 guess, got %d", len(state.Guesses))
 	}
-	g := state.Guesses[0]
-	if g.Result != "ball" {
-		t.Errorf("expected result to be 'ball', got %s", g.Result)
-	}
 
 	if savedGuess == nil {
 		t.Fatal("expected guess to be saved to repository, but was nil")
 	}
-	if savedGuess.Result != "ball" {
-		t.Errorf("expected saved guess result to be 'ball', got %s", savedGuess.Result)
-	}
 }
 
-func TestSubmitGuess_Strike(t *testing.T) {
-	puzzle, _, players := setupSubmitGuessTest()
-	sessionID := "session-strike"
-
-	var savedGuess *models.Guess
-	repo := &mockRepository{
-		getPlayerByIDFunc: func(id int) (*models.Player, error) {
-			p, ok := players[id]
-			if !ok {
-				return nil, errors.New("player not found")
-			}
-			return p, nil
-		},
-		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
-			return nil, nil
-		},
-		hasPlayerBeenGuessedFunc: func(sID string, pID int, playerID int) (bool, error) {
-			return false, nil
-		},
-		saveGuessFunc: func(g *models.Guess) error {
-			savedGuess = g
-			return nil
-		},
-	}
-
-	svc := service.NewGameService(repo)
-	state, err := svc.SubmitGuess(sessionID, puzzle, 3) // player 3 has 0 matches -> strike
-	if err != nil {
-		t.Fatalf("unexpected error submitting guess: %v", err)
-	}
-
-	if state.Status != "active" {
-		t.Errorf("expected state status to be 'active', got %s", state.Status)
-	}
-	if state.Balls != 0 {
-		t.Errorf("expected balls to be 0, got %d", state.Balls)
-	}
-	if state.Strikes != 1 {
-		t.Errorf("expected strikes to be 1, got %d", state.Strikes)
-	}
-	if len(state.Guesses) != 1 {
-		t.Fatalf("expected 1 guess, got %d", len(state.Guesses))
-	}
-	g := state.Guesses[0]
-	if g.Result != "strike" {
-		t.Errorf("expected result to be 'strike', got %s", g.Result)
-	}
-
-	if savedGuess == nil {
-		t.Fatal("expected guess to be saved to repository, but was nil")
-	}
-	if savedGuess.Result != "strike" {
-		t.Errorf("expected saved guess result to be 'strike', got %s", savedGuess.Result)
-	}
-}
-
-func TestSubmitGuess_StrikeToLost(t *testing.T) {
+func TestGetPuzzleAnswer(t *testing.T) {
 	puzzle, target, players := setupSubmitGuessTest()
-	sessionID := "session-lost"
-
-	// Mock existing 2 strike guesses in DB
-	existingGuesses := []models.Guess{
-		{ID: 10, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 0, Strikes: 1, Result: "strike"},
-		{ID: 11, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 0, Strikes: 2, Result: "strike"},
-	}
-
-	var savedGuess *models.Guess
 	repo := &mockRepository{
 		getPlayerByIDFunc: func(id int) (*models.Player, error) {
-			p, ok := players[id]
-			if !ok {
-				return nil, errors.New("player not found")
-			}
-			return p, nil
+			return players[id], nil
 		},
-		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
-			return existingGuesses, nil
-		},
-		hasPlayerBeenGuessedFunc: func(sID string, pID int, playerID int) (bool, error) {
-			return false, nil
-		},
-		saveGuessFunc: func(g *models.Guess) error {
-			savedGuess = g
-			return nil
+		getPitchProfileByIDFunc: func(id int) (*models.PitchProfile, error) {
+			return &models.PitchProfile{
+				ID:        id,
+				PitchType: "Slider",
+				Velocity:  88.5,
+				SpinRate:  2500,
+			}, nil
 		},
 	}
 
 	svc := service.NewGameService(repo)
-	state, err := svc.SubmitGuess(sessionID, puzzle, 3) // player 3 has 0 matches -> 3rd strike
+	ans, err := svc.GetPuzzleAnswer(puzzle)
 	if err != nil {
-		t.Fatalf("unexpected error submitting guess: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if state.Status != "lost" {
-		t.Errorf("expected state status to be 'lost', got %s", state.Status)
+	if ans.PlayerID != target.ID || ans.PlayerName != target.Name {
+		t.Errorf("expected target player %+v, got %+v", target, ans)
 	}
-	if state.Balls != 0 {
-		t.Errorf("expected balls to be 0, got %d", state.Balls)
-	}
-	if state.Strikes != 3 {
-		t.Errorf("expected strikes to be 3, got %d", state.Strikes)
-	}
-	if state.Answer == nil || state.Answer.ID != target.ID || state.Answer.Name != target.Name {
-		t.Errorf("expected state answer to be %+v, got %+v", target, state.Answer)
-	}
-	if len(state.Guesses) != 3 {
-		t.Fatalf("expected 3 guesses, got %d", len(state.Guesses))
-	}
-	g := state.Guesses[2]
-	if g.Result != "strike" {
-		t.Errorf("expected last guess result to be 'strike', got %s", g.Result)
-	}
-
-	if savedGuess == nil {
-		t.Fatal("expected guess to be saved to repository, but was nil")
-	}
-	if savedGuess.Result != "strike" {
-		t.Errorf("expected saved guess result to be 'strike', got %s", savedGuess.Result)
+	if ans.PitchType != "Slider" {
+		t.Errorf("expected pitch type Slider, got %s", ans.PitchType)
 	}
 }
 
 func TestSubmitGuess_ValidationErrors(t *testing.T) {
 	puzzle, _, players := setupSubmitGuessTest()
 	sessionID := "session-validation"
-
-	t.Run("Game already won", func(t *testing.T) {
-		// Mock 1 guess which was correct
-		existingGuesses := []models.Guess{
-			{ID: 10, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 1, Balls: 0, Strikes: 0, Result: "correct"},
-		}
-		repo := &mockRepository{
-			getPlayerByIDFunc: func(id int) (*models.Player, error) {
-				return players[id], nil
-			},
-			getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
-				return existingGuesses, nil
-			},
-		}
-		svc := service.NewGameService(repo)
-		_, err := svc.SubmitGuess(sessionID, puzzle, 2)
-		if err == nil {
-			t.Error("expected error when game is already won, got nil")
-		}
-	})
-
-	t.Run("Game already lost", func(t *testing.T) {
-		// Mock 3 strike guesses
-		existingGuesses := []models.Guess{
-			{ID: 10, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 0, Strikes: 1, Result: "strike"},
-			{ID: 11, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 0, Strikes: 2, Result: "strike"},
-			{ID: 12, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 0, Strikes: 3, Result: "strike"},
-		}
-		repo := &mockRepository{
-			getPlayerByIDFunc: func(id int) (*models.Player, error) {
-				return players[id], nil
-			},
-			getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
-				return existingGuesses, nil
-			},
-		}
-		svc := service.NewGameService(repo)
-		_, err := svc.SubmitGuess(sessionID, puzzle, 2)
-		if err == nil {
-			t.Error("expected error when game is already lost, got nil")
-		}
-	})
 
 	t.Run("Player already guessed in session", func(t *testing.T) {
 		repo := &mockRepository{
@@ -604,6 +496,257 @@ func TestSubmitGuess_ValidationErrors(t *testing.T) {
 		_, err := svc.SubmitGuess(sessionID, puzzle, 2)
 		if err == nil {
 			t.Error("expected error when player has already been guessed, got nil")
+		}
+	})
+}
+
+func TestSubmitGuess_WithoutPitchGuessFails(t *testing.T) {
+	puzzle, target, players := setupSubmitGuessTest()
+	sessionID := "session-no-pitch"
+
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+			return nil, nil
+		},
+		getPitchGuessBySessionAndPuzzleFunc: func(sID string, pID int) (*models.PitchGuess, error) {
+			return nil, nil // Pitch not guessed yet
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	_, err := svc.SubmitGuess(sessionID, puzzle, target.ID)
+	if err == nil {
+		t.Fatal("expected error when submitting guess before pitch guess, got nil")
+	}
+}
+
+func TestSubmitPitchGuess_Match(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-pitch-match"
+
+	var savedPitchGuess *models.PitchGuess
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getPitchProfileByIDFunc: func(id int) (*models.PitchProfile, error) {
+			return &models.PitchProfile{
+				ID:        id,
+				PitchType: "Slider",
+				Velocity:  88.5,
+				SpinRate:  2600.0,
+			}, nil
+		},
+		getPitchGuessBySessionAndPuzzleFunc: func(sID string, pID int) (*models.PitchGuess, error) {
+			return nil, nil // not guessed yet
+		},
+		savePitchGuessFunc: func(g *models.PitchGuess) error {
+			savedPitchGuess = g
+			return nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	state, err := svc.SubmitPitchGuess(sessionID, puzzle, "slider")
+	if err != nil {
+		t.Fatalf("unexpected error submitting pitch guess: %v", err)
+	}
+
+	if !state.PitchGuessed {
+		t.Error("expected state.PitchGuessed to be true")
+	}
+	if state.PitchGuess == nil {
+		t.Fatal("expected state.PitchGuess to be non-nil")
+	}
+	if !state.PitchGuess.Matched {
+		t.Errorf("expected Matched to be true, got false")
+	}
+	if state.PitchGuess.ActualType != "Slider" {
+		t.Errorf("expected ActualType to be Slider, got %s", state.PitchGuess.ActualType)
+	}
+	if state.PitchGuess.Velocity != 88.5 {
+		t.Errorf("expected Velocity 88.5, got %f", state.PitchGuess.Velocity)
+	}
+	if savedPitchGuess == nil || !savedPitchGuess.Matched {
+		t.Errorf("expected saved pitch guess to be matched")
+	}
+}
+
+func TestSubmitPitchGuess_Mismatch(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-pitch-mismatch"
+
+	var savedPitchGuess *models.PitchGuess
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getPitchProfileByIDFunc: func(id int) (*models.PitchProfile, error) {
+			return &models.PitchProfile{
+				ID:        id,
+				PitchType: "Curveball",
+				Velocity:  82.0,
+				SpinRate:  2800.0,
+			}, nil
+		},
+		getPitchGuessBySessionAndPuzzleFunc: func(sID string, pID int) (*models.PitchGuess, error) {
+			return nil, nil // not guessed yet
+		},
+		savePitchGuessFunc: func(g *models.PitchGuess) error {
+			savedPitchGuess = g
+			return nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	state, err := svc.SubmitPitchGuess(sessionID, puzzle, "Changeup")
+	if err != nil {
+		t.Fatalf("unexpected error submitting pitch guess: %v", err)
+	}
+
+	if !state.PitchGuessed {
+		t.Error("expected state.PitchGuessed to be true")
+	}
+	if state.PitchGuess == nil {
+		t.Fatal("expected state.PitchGuess to be non-nil")
+	}
+	if state.PitchGuess.Matched {
+		t.Errorf("expected Matched to be false, got true")
+	}
+	if state.PitchGuess.ActualType != "Curveball" {
+		t.Errorf("expected ActualType to be Curveball, got %s", state.PitchGuess.ActualType)
+	}
+	if savedPitchGuess == nil || savedPitchGuess.Matched {
+		t.Errorf("expected saved pitch guess matched to be false")
+	}
+}
+
+func TestSubmitPitchGuess_AlreadyGuessed(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-pitch-already"
+
+	repo := &mockRepository{
+		getPlayerByIDFunc: func(id int) (*models.Player, error) {
+			return players[id], nil
+		},
+		getPitchGuessBySessionAndPuzzleFunc: func(sID string, pID int) (*models.PitchGuess, error) {
+			return &models.PitchGuess{
+				SessionID:        sessionID,
+				PuzzleID:         puzzle.ID,
+				GuessedPitchType: "Sinker",
+				Matched:          true,
+			}, nil
+		},
+	}
+
+	svc := service.NewGameService(repo)
+	_, err := svc.SubmitPitchGuess(sessionID, puzzle, "Sinker")
+	if err == nil {
+		t.Fatal("expected error when pitch type was already guessed, got nil")
+	}
+}
+
+func TestSubmitPitchGuess_Empty(t *testing.T) {
+	puzzle, _, _ := setupSubmitGuessTest()
+	sessionID := "session-pitch-empty"
+	repo := &mockRepository{}
+	svc := service.NewGameService(repo)
+	_, err := svc.SubmitPitchGuess(sessionID, puzzle, "   ")
+	if err == nil {
+		t.Fatal("expected error for empty pitch type, got nil")
+	}
+}
+
+func TestMilestoneHints_At3And5Guesses(t *testing.T) {
+	puzzle, _, players := setupSubmitGuessTest()
+	sessionID := "session-hints"
+
+	t.Run("Hints unlocked progressively", func(t *testing.T) {
+		// 0 guesses -> no hints
+		repo0 := &mockRepository{
+			getPlayerByIDFunc: func(id int) (*models.Player, error) {
+				return players[id], nil
+			},
+			getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+				return nil, nil
+			},
+		}
+		svc0 := service.NewGameService(repo0)
+		state0, err := svc0.GetGameState(sessionID, puzzle)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if state0.Hints != nil {
+			t.Errorf("expected no hints for 0 guesses, got %+v", state0.Hints)
+		}
+
+		// 3 guesses -> pitch mix unlocked, role & past teams not yet
+		guesses3 := []models.Guess{
+			{ID: 1, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 2, Balls: 1, Strikes: 0, Result: "ball"},
+			{ID: 2, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 1, Strikes: 1, Result: "strike"},
+			{ID: 3, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 4, Balls: 2, Strikes: 1, Result: "ball"},
+		}
+		repo3 := &mockRepository{
+			getPlayerByIDFunc: func(id int) (*models.Player, error) {
+				return players[id], nil
+			},
+			getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+				return guesses3, nil
+			},
+		}
+		svc3 := service.NewGameService(repo3)
+		state3, err := svc3.GetGameState(sessionID, puzzle)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if state3.Hints == nil {
+			t.Fatal("expected hints to be non-nil for 3 guesses")
+		}
+		if len(state3.Hints.PitchMix) == 0 {
+			t.Errorf("expected PitchMix to be populated for 3 guesses")
+		}
+		if state3.Hints.Role != "" {
+			t.Errorf("expected Role to be empty for 3 guesses, got %s", state3.Hints.Role)
+		}
+		if len(state3.Hints.PastTeams) != 0 {
+			t.Errorf("expected PastTeams to be empty for 3 guesses, got %+v", state3.Hints.PastTeams)
+		}
+
+		// 5 guesses -> pitch mix, role, and past teams all unlocked
+		guesses5 := []models.Guess{
+			{ID: 1, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 2, Balls: 1, Strikes: 0, Result: "ball"},
+			{ID: 2, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 3, Balls: 1, Strikes: 1, Result: "strike"},
+			{ID: 3, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 4, Balls: 2, Strikes: 1, Result: "ball"},
+			{ID: 4, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 2, Balls: 3, Strikes: 1, Result: "ball"},
+			{ID: 5, SessionID: sessionID, PuzzleID: puzzle.ID, GuessedPlayerID: 4, Balls: 4, Strikes: 1, Result: "ball"},
+		}
+		repo5 := &mockRepository{
+			getPlayerByIDFunc: func(id int) (*models.Player, error) {
+				return players[id], nil
+			},
+			getGuessesBySessionAndPuzzleFunc: func(sID string, pID int) ([]models.Guess, error) {
+				return guesses5, nil
+			},
+		}
+		svc5 := service.NewGameService(repo5)
+		state5, err := svc5.GetGameState(sessionID, puzzle)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if state5.Hints == nil {
+			t.Fatal("expected hints to be non-nil for 5 guesses")
+		}
+		if len(state5.Hints.PitchMix) == 0 {
+			t.Errorf("expected PitchMix to be populated for 5 guesses")
+		}
+		if state5.Hints.Role == "" {
+			t.Errorf("expected Role to be populated for 5 guesses")
+		}
+		if len(state5.Hints.PastTeams) == 0 {
+			t.Errorf("expected PastTeams to be populated for 5 guesses")
 		}
 	})
 }

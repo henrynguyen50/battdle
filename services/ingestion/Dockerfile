@@ -3,8 +3,8 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# Copy go.mod
-COPY go.mod ./
+# Copy go.mod and go.sum
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
@@ -23,6 +23,8 @@ RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /ingestion /ingestion
 # Copy CSV data into the image for processing
+COPY updated1.csv /app/updated1.csv
+COPY updated.csv /app/updated.csv
 COPY savant_data.csv /app/savant_data.csv
 COPY player_metadata.csv /app/player_metadata.csv
 
