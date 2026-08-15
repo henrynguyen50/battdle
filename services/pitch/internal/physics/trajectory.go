@@ -14,13 +14,15 @@ type Point3D struct {
 
 // CalculateTrajectory computes a 3D trajectory from a pitch profile.
 //
-// RHP releases on screen RIGHT (x0 > 0), LHP releases on screen LEFT (x0 < 0).
+// Hitter's Perspective Coordinate Alignment:
+// - RHP: Right throwing arm is on screen LEFT (x0 < 0, e.g. -2.46 ft).
+// - LHP: Left throwing arm is on screen RIGHT (x0 > 0, e.g. +2.20 ft).
 func CalculateTrajectory(p *models.PitchProfile) []Point3D {
 	x0 := p.ReleasePosX
+	xf := p.PlateX
+
 	y0 := 60.5 - p.ReleaseExtension
 	z0 := p.ReleasePosZ
-
-	xf := p.PlateX
 	yf := 1.417
 	zf := p.PlateZ
 
@@ -48,14 +50,14 @@ func CalculateTrajectory(p *models.PitchProfile) []Point3D {
 	}
 
 	// Lateral acceleration (ax):
-	// - For RHP (x0 >= 0): ax = 2 * breakXFt / T^2 => Negative BreakX fades RIGHT (+X)
-	// - For LHP (x0 < 0): ax = -2 * breakXFt / T^2 => Positive BreakX fades LEFT (-X)
-	isRHP := x0 >= 0
+	// - For RHP (x0 <= 0): ax = -2 * breakXFt / T^2 => BreakX < 0 fades LEFT (-X, arm-side)
+	// - For LHP (x0 > 0): ax = 2 * breakXFt / T^2  => BreakX > 0 fades RIGHT (+X, arm-side)
+	isRHP := x0 <= 0
 	var ax float64
 	if isRHP {
-		ax = (2.0 * breakXFt) / (T * T)
-	} else {
 		ax = (-2.0 * breakXFt) / (T * T)
+	} else {
+		ax = (2.0 * breakXFt) / (T * T)
 	}
 
 	// -------------------------------------------------------------

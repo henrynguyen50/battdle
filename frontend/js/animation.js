@@ -137,10 +137,18 @@ const PitchleAnimation = {
             } else {
                 this.trajectoryPoints = [];
             }
-
             // Extract pitch delivery parameters (arm angle, hand, extension)
             if (this.deliveryEngine) {
                 this.pitchParams = this.deliveryEngine.parsePitchParams(animationData);
+            }
+
+            // Check if game has target player ID
+            if (window.PitchleGame && window.PitchleGame.gameState && window.PitchleGame.gameState.answer) {
+                this.pitchParams.mlbId = window.PitchleGame.gameState.answer.id;
+            }
+
+            if (this.pitchParams && this.pitchParams.mlbId && this.deliveryEngine) {
+                await this.deliveryEngine.loadMocapClip(this.pitchParams.mlbId);
             }
 
             // Calculate flight duration T from last point
@@ -152,7 +160,6 @@ const PitchleAnimation = {
             if (!this.initialized) {
                 this.initThreeJS();
             }
-
             // Build glowing 3D trajectory ball path
             this.buildBallPath();
 

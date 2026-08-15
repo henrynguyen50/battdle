@@ -299,10 +299,10 @@ const PitchleGame = {
                     window.PitchleUI.showTestBanner(answer);
                     if (window.PitchleAnimation) {
                         window.PitchleAnimation.setPitchParams({
+                            mlb_id: 694973,
                             arm_angle: answer.arm_angle,
                             pitch_hand: answer.pitch_hand
                         });
-                        // Automatically load and play Skenes's delivery!
                         window.PitchleAnimation.handleWatchClick();
                     }
 

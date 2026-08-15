@@ -185,15 +185,15 @@ func TestCalculateTrajectory_FlightTime(t *testing.T) {
 	}
 }
 
-// TestCalculateTrajectory_Kinematics_RHP verifies that for an RHP (ReleasePosX >= 0):
-// - Sinker (BreakX < 0) curves to the RIGHT (midPt.X > linearX).
-// - Sweeper (BreakX > 0) curves to the LEFT (midSweeper.X < linearSweeperX).
+// TestCalculateTrajectory_Kinematics_RHP verifies that for an RHP (ReleasePosX >= 0 mapped to screen LEFT x0 < 0):
+// - Sinker (BreakX < 0) curves to the LEFT (midPt.X < linearX).
+// - Sweeper (BreakX > 0) curves to the RIGHT (midSweeper.X > linearSweeperX).
 func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 	rhpSinker := &models.PitchProfile{
-		ReleasePosX:      2.4, // RHP on screen RIGHT (> 0)
+		ReleasePosX:      -2.4, // RHP on screen LEFT (< 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.2,
-		PlateX:           0.48,
+		PlateX:           -0.48,
 		PlateZ:           1.65,
 		Velocity:         96.4,
 		BreakX:           -15.0, // Negative BreakX (arm-side run)
@@ -205,18 +205,22 @@ func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 		t.Fatalf("expected 61 points, got %d", len(points))
 	}
 
-	midPt := points[30]
-	linearX := (rhpSinker.ReleasePosX + rhpSinker.PlateX) / 2.0
-	// For RHP, Sinker curves to the RIGHT (midPt.X > linearX)
-	if midPt.X <= linearX {
-		t.Errorf("RHP Sinker should curve to the RIGHT: midPt.X=%f <= linearX=%f", midPt.X, linearX)
+	// Release point must be on screen LEFT (x0 < 0)
+	if points[0].X >= 0 {
+		t.Errorf("RHP release point must be on screen LEFT: points[0].X=%f", points[0].X)
 	}
 
+	midPt := points[30]
+	linearX := (points[0].X + points[60].X) / 2.0
+	// Sinker curves to screen LEFT (midPt.X < linearX)
+	if midPt.X >= linearX {
+		t.Errorf("RHP Sinker should curve to the LEFT: midPt.X=%f >= linearX=%f", midPt.X, linearX)
+	}
 	rhpSweeper := &models.PitchProfile{
-		ReleasePosX:      2.4, // RHP on screen RIGHT (> 0)
+		ReleasePosX:      -2.4, // RHP on screen LEFT (< 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.2,
-		PlateX:           -0.75,
+		PlateX:           0.75,
 		PlateZ:           1.60,
 		Velocity:         84.0,
 		BreakX:           14.0, // Positive BreakX (glove-side sweep)
@@ -225,16 +229,16 @@ func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 
 	sweeperPoints := CalculateTrajectory(rhpSweeper)
 	midSweeper := sweeperPoints[30]
-	linearSweeperX := (rhpSweeper.ReleasePosX + rhpSweeper.PlateX) / 2.0
-	// For RHP, Sweeper curves to the LEFT (midSweeper.X < linearSweeperX)
-	if midSweeper.X >= linearSweeperX {
-		t.Errorf("RHP Sweeper should curve to the LEFT: midSweeper.X=%f >= linearSweeperX=%f", midSweeper.X, linearSweeperX)
+	linearSweeperX := (sweeperPoints[0].X + sweeperPoints[60].X) / 2.0
+	// Sweeper curves to screen RIGHT (midSweeper.X > linearSweeperX)
+	if midSweeper.X <= linearSweeperX {
+		t.Errorf("RHP Sweeper should curve to the RIGHT: midSweeper.X=%f <= linearSweeperX=%f", midSweeper.X, linearSweeperX)
 	}
 }
 
 // TestCalculateTrajectory_Kinematics_LHP verifies that for an LHP (ReleasePosX < 0):
-// - Sinker (BreakX > 0 in Statcast) curves OUTWARDS (midPt.X > linearX).
-// - Sweeper (BreakX < 0 in Statcast) curves INWARDS across the zone (midSweeper.X < linearSweeperX).
+// - Sinker (BreakX > 0 in Statcast) curves to the RIGHT (midPt.X > linearX).
+// - Sweeper (BreakX < 0 in Statcast) curves to the LEFT (midSweeper.X < linearSweeperX).
 func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
 	lhpSinker := &models.PitchProfile{
 		ReleasePosX:      -2.2, // LHP on screen LEFT (< 0)
@@ -248,15 +252,19 @@ func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
 	}
 
 	points := CalculateTrajectory(lhpSinker)
+	if points[0].X >= 0 {
+		t.Errorf("LHP release point must be on screen LEFT: points[0].X=%f", points[0].X)
+	}
+
 	midPt := points[30]
-	linearX := (lhpSinker.ReleasePosX + lhpSinker.PlateX) / 2.0
-	// For LHP, Sinker curves OUTWARDS (midPt.X > linearX)
+	linearX := (points[0].X + points[60].X) / 2.0
+	// Sinker curves to screen RIGHT (midPt.X > linearX)
 	if midPt.X <= linearX {
-		t.Errorf("LHP Sinker should curve OUTWARDS: midPt.X=%f <= linearX=%f", midPt.X, linearX)
+		t.Errorf("LHP Sinker should curve to the RIGHT: midPt.X=%f <= linearX=%f", midPt.X, linearX)
 	}
 
 	lhpSweeper := &models.PitchProfile{
-		ReleasePosX:      -2.2, // LHP on screen LEFT (< 0)
+		ReleasePosX:      -2.2,
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.0,
 		PlateX:           0.55,
@@ -268,10 +276,10 @@ func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
 
 	sweeperPoints := CalculateTrajectory(lhpSweeper)
 	midSweeper := sweeperPoints[30]
-	linearSweeperX := (lhpSweeper.ReleasePosX + lhpSweeper.PlateX) / 2.0
-	// For LHP, Sweeper curves INWARDS across the zone (midSweeper.X < linearSweeperX)
+	linearSweeperX := (sweeperPoints[0].X + sweeperPoints[60].X) / 2.0
+	// Sweeper curves to screen LEFT (midSweeper.X < linearSweeperX)
 	if midSweeper.X >= linearSweeperX {
-		t.Errorf("LHP Sweeper should curve INWARDS: midSweeper.X=%f >= linearSweeperX=%f", midSweeper.X, linearSweeperX)
+		t.Errorf("LHP Sweeper should curve to the LEFT: midSweeper.X=%f >= linearSweeperX=%f", midSweeper.X, linearSweeperX)
 	}
 }
 // TestCalculateTrajectory_CurveballHump verifies that a curveball pops upward in early flight (hump arc)

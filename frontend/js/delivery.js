@@ -103,8 +103,11 @@
             let isLHP = false;
             let extension = 6.2; // standard MLB stride (ft)
             let releasePos = { x: -1.8, y: 54.3, z: 5.8 };
+            let mlbId = null;
 
             if (pitchData) {
+                mlbId = pitchData.mlb_id || pitchData.mlbId || pitchData.player_id || pitchData.playerId || null;
+
                 if (typeof pitchData.arm_angle === 'number' && !isNaN(pitchData.arm_angle)) {
                     armAngle = pitchData.arm_angle;
                 } else if (pitchData.armAngle) {
@@ -129,11 +132,9 @@
                     releasePos = { x: p0.x, y: p0.y, z: p0.z };
                     extension = clamp(60.5 - p0.y, 4.5, 8.0);
                     if (pitchData.pitch_hand === undefined) {
-                        isLHP = p0.x < -0.2;
+                        isLHP = p0.x > 0.2;
                     }
                     if (pitchData.arm_angle === undefined) {
-                        // Estimate arm angle from release height z0 vs extension
-                        // Height 4.0-5.2 -> sidearm/low 3/4 (20-35 deg), 5.5-6.2 -> high 3/4 (45-55 deg), >6.3 -> overhand (>60 deg)
                         const estimatedAngle = (releasePos.z - 4.5) * 25.0 + 30.0;
                         armAngle = clamp(estimatedAngle, 10.0, 75.0);
                     }
@@ -142,12 +143,13 @@
                     releasePos = { x: p0.x, y: p0.y, z: p0.z };
                     extension = clamp(60.5 - p0.y, 4.5, 8.0);
                     if (pitchData.pitch_hand === undefined) {
-                        isLHP = p0.x < -0.2;
+                        isLHP = p0.x > 0.2;
                     }
                 }
             }
 
             return {
+                mlbId: mlbId,
                 armAngle: clamp(armAngle, 0.0, 90.0),
                 isLHP: isLHP,
                 extension: clamp(extension, 4.5, 7.8),
@@ -166,6 +168,81 @@
             if (angle < 65.0) return 'Overhand';
             return 'Over-the-Top';
         }
+        /**
+         * Applies real video mocap keyframe interpolation to pitcher model
+         */
+        applyMocapPose(pitcher, t, mocapClip) {
+            if (!mocapClip || !mocapClip.keyframes || mocapClip.keyframes.length === 0) return false;
+            const kfs = mocapClip.keyframes;
+            t = clamp(t, 0.0, mocapClip.duration || 1.80);
+
+            let idx = 0;
+            for (let i = 0; i < kfs.length - 1; i++) {
+                if (t >= kfs[i].t && t <= kfs[i + 1].t) {
+                    idx = i;
+                    break;
+                }
+            }
+            const k0 = kfs[idx];
+            const k1 = kfs[idx + 1] || k0;
+            const dt = k1.t - k0.t;
+            const alpha = dt > 0 ? (t - k0.t) / dt : 0;
+
+            const lerpArr = (a0, a1) => [
+                lerp(a0[0], a1[0], alpha),
+                lerp(a0[1], a1[1], alpha),
+                lerp(a0[2], a1[2], alpha)
+            ];
+
+            const bones = pitcher.bones;
+            const isLHP = !!mocapClip.isLHP;
+            pitcher.setHandedness(isLHP);
+
+            const pRot = lerpArr(k0.pelvisRot, k1.pelvisRot);
+            bones.root.position.copy(this.RUBBER_POS);
+
+            const progress = clamp(t / 1.25, 0, 1);
+            const strideDist = progress * 4.5;
+            bones.pelvis.position.set(0, 3.25 - Math.sin(progress * Math.PI) * 0.35, -strideDist * 0.7);
+            bones.pelvis.rotation.set(pRot[0], pRot[1], pRot[2]);
+
+            const cRot = lerpArr(k0.chestRot, k1.chestRot);
+            bones.chest.rotation.set(cRot[0], cRot[1], cRot[2]);
+            bones.spine.rotation.set(cRot[0] * 0.5, cRot[1] * 0.5, cRot[2] * 0.5);
+
+            bones.neck.rotation.set(-cRot[0] * 0.5, -pRot[1] * 0.75, -cRot[2] * 0.5);
+            bones.head.rotation.set(-cRot[0] * 0.3, -pRot[1] * 0.25, -cRot[2] * 0.3);
+
+            const throwUpperArm = isLHP ? bones.upperArmL : bones.upperArmR;
+            const throwForearm = isLHP ? bones.forearmL : bones.forearmR;
+            const gloveUpperArm = isLHP ? bones.upperArmR : bones.upperArmL;
+            const gloveForearm = isLHP ? bones.forearmR : bones.forearmL;
+
+            if (k0.throwArm && k1.throwArm) {
+                const tu = lerpArr(k0.throwArm.upper, k1.throwArm.upper);
+                const tf = lerpArr(k0.throwArm.forearm, k1.throwArm.forearm);
+                throwUpperArm.rotation.set(tu[0], tu[1], tu[2]);
+                throwForearm.rotation.set(tf[0], tf[1], tf[2]);
+            }
+
+            if (k0.gloveArm && k1.gloveArm) {
+                const gu = lerpArr(k0.gloveArm.upper, k1.gloveArm.upper);
+                const gf = lerpArr(k0.gloveArm.forearm, k1.gloveArm.forearm);
+                gloveUpperArm.rotation.set(gu[0], gu[1], gu[2]);
+                gloveForearm.rotation.set(gf[0], gf[1], gf[2]);
+            }
+
+            const strideThigh = isLHP ? bones.thighR : bones.thighL;
+            const strideKnee = isLHP ? bones.kneeR : bones.kneeL;
+            if (k0.strideLeg && k1.strideLeg) {
+                const st = lerpArr(k0.strideLeg.thigh, k1.strideLeg.thigh);
+                const sk = lerpArr(k0.strideLeg.knee, k1.strideLeg.knee);
+                strideThigh.rotation.set(st[0], st[1], st[2]);
+                strideKnee.rotation.set(sk[0], sk[1], sk[2]);
+            }
+
+            return true;
+        }
 
         /**
          * Applies skeletal kinematics to pitcher character model at time `t` (seconds)
@@ -174,9 +251,15 @@
             if (!pitcher || !pitcher.bones) return;
 
             const params = this.parsePitchParams(pitchParams);
+            const mlbId = params.mlbId || pitchParams.mlb_id || pitchParams.mlbId;
+            if (mlbId && this.mocapClips[mlbId]) {
+                if (this.applyMocapPose(pitcher, t, this.mocapClips[mlbId])) {
+                    return;
+                }
+            }
+
             const { armAngle, isLHP, extension } = params;
             const bones = pitcher.bones;
-
             // Set handedness on model
             pitcher.setHandedness(isLHP);
 
