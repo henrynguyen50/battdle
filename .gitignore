@@ -1,3 +1,5 @@
 .DS_Store
 *.out
 coverage.out
+*.pt
+*.mp4

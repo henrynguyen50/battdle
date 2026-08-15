@@ -77,6 +77,22 @@
 
             // Rubber placement anchor
             this.RUBBER_POS = new THREE.Vector3(0, 0.84, 60.5);
+            this.mocapClips = {};
+        }
+
+        async loadMocapClip(mlbId) {
+            if (!mlbId || this.mocapClips[mlbId]) return this.mocapClips[mlbId];
+            try {
+                const res = await fetch(`/animations/pitchers/${mlbId}.json`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.mocapClips[mlbId] = data;
+                    return data;
+                }
+            } catch (e) {
+                // Ignore missing mocap
+            }
+            return null;
         }
 
         /**

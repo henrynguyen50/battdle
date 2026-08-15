@@ -101,6 +101,11 @@ const PitchleAnimation = {
         if (!this.deliveryEngine) return;
         this.pitchParams = this.deliveryEngine.parsePitchParams(params);
 
+        const mlbId = params.mlb_id || params.mlbId || params.player_id;
+        if (mlbId) {
+            this.deliveryEngine.loadMocapClip(mlbId);
+        }
+
         if (this.pitcher) {
             this.deliveryEngine.applyDeliveryPose(this.pitcher, 0.0, this.pitchParams);
             this.positionBallInHand();
