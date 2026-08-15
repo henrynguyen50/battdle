@@ -185,15 +185,15 @@ func TestCalculateTrajectory_FlightTime(t *testing.T) {
 	}
 }
 
-// TestCalculateTrajectory_Kinematics_RHP verifies that for an RHP (ReleasePosX >= 0):
+// TestCalculateTrajectory_Kinematics_RHP verifies that for an RHP (ReleasePosX < 0):
 // - Sinker (BreakX < 0) curves OUTWARDS (midPt.X < linearX).
 // - Sweeper (BreakX > 0) curves INWARDS across the zone (midSweeper.X > linearSweeperX).
 func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 	rhpSinker := &models.PitchProfile{
-		ReleasePosX:      2.4, // RHP (> 0)
+		ReleasePosX:      -2.4, // RHP on screen LEFT (< 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.2,
-		PlateX:           0.48,
+		PlateX:           -0.48,
 		PlateZ:           1.65,
 		Velocity:         96.4,
 		BreakX:           -15.0, // Negative BreakX (arm-side run)
@@ -207,16 +207,16 @@ func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 
 	midPt := points[30]
 	linearX := (rhpSinker.ReleasePosX + rhpSinker.PlateX) / 2.0
-	// For RHP, Sinker curves OUTWARDS (midPt.X < linearX)
+	// For RHP, Sinker curves OUTWARDS to the left (midPt.X < linearX)
 	if midPt.X >= linearX {
 		t.Errorf("RHP Sinker should curve OUTWARDS: midPt.X=%f >= linearX=%f", midPt.X, linearX)
 	}
 
 	rhpSweeper := &models.PitchProfile{
-		ReleasePosX:      2.4, // RHP (> 0)
+		ReleasePosX:      -2.4, // RHP on screen LEFT (< 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.2,
-		PlateX:           -0.75,
+		PlateX:           0.75,
 		PlateZ:           1.60,
 		Velocity:         84.0,
 		BreakX:           14.0, // Positive BreakX (glove-side sweep)
@@ -232,15 +232,15 @@ func TestCalculateTrajectory_Kinematics_RHP(t *testing.T) {
 	}
 }
 
-// TestCalculateTrajectory_Kinematics_LHP verifies that for an LHP (ReleasePosX < 0):
+// TestCalculateTrajectory_Kinematics_LHP verifies that for an LHP (ReleasePosX > 0):
 // - Sinker (BreakX > 0 in Statcast) curves OUTWARDS (midPt.X > linearX).
 // - Sweeper (BreakX < 0 in Statcast) curves INWARDS (midSweeper.X < linearSweeperX).
 func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
 	lhpSinker := &models.PitchProfile{
-		ReleasePosX:      -2.2, // LHP (< 0)
+		ReleasePosX:      2.2, // LHP on screen RIGHT (> 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.0,
-		PlateX:           -0.48,
+		PlateX:           0.48,
 		PlateZ:           1.65,
 		Velocity:         94.0,
 		BreakX:           15.0, // Positive BreakX for LHP in Statcast (arm-side run)
@@ -250,16 +250,16 @@ func TestCalculateTrajectory_Kinematics_LHP(t *testing.T) {
 	points := CalculateTrajectory(lhpSinker)
 	midPt := points[30]
 	linearX := (lhpSinker.ReleasePosX + lhpSinker.PlateX) / 2.0
-	// For LHP, Sinker curves OUTWARDS (midPt.X > linearX)
+	// For LHP, Sinker curves OUTWARDS to the right (midPt.X > linearX)
 	if midPt.X <= linearX {
 		t.Errorf("LHP Sinker should curve OUTWARDS: midPt.X=%f <= linearX=%f", midPt.X, linearX)
 	}
 
 	lhpSweeper := &models.PitchProfile{
-		ReleasePosX:      -2.2, // LHP (< 0)
+		ReleasePosX:      2.2, // LHP on screen RIGHT (> 0)
 		ReleasePosZ:      5.5,
 		ReleaseExtension: 6.0,
-		PlateX:           0.55,
+		PlateX:           -0.55,
 		PlateZ:           1.60,
 		Velocity:         82.0,
 		BreakX:           -14.0, // Negative BreakX for LHP in Statcast (glove-side sweep)

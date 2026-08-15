@@ -129,7 +129,7 @@
                     releasePos = { x: p0.x, y: p0.y, z: p0.z };
                     extension = clamp(60.5 - p0.y, 4.5, 8.0);
                     if (pitchData.pitch_hand === undefined) {
-                        isLHP = p0.x < -0.2; // LHP releases on screen LEFT (x0 < 0)
+                        isLHP = p0.x > 0.2; // LHP releases on screen RIGHT (x0 > 0)
                     }
                     if (pitchData.arm_angle === undefined) {
                         // Estimate arm angle from release height z0 vs extension
@@ -142,7 +142,7 @@
                     releasePos = { x: p0.x, y: p0.y, z: p0.z };
                     extension = clamp(60.5 - p0.y, 4.5, 8.0);
                     if (pitchData.pitch_hand === undefined) {
-                        isLHP = p0.x < -0.2;
+                        isLHP = p0.x > 0.2;
                     }
                 }
             }
@@ -180,8 +180,8 @@
             // Set handedness on model
             pitcher.setHandedness(isLHP);
 
-            // Handedness multiplier: RHP has h = -1.0, LHP has h = 1.0
-            const h = isLHP ? 1.0 : -1.0;
+            // Handedness multiplier: RHP has h = 1.0 (left glove shoulder forward), LHP has h = -1.0 (right glove shoulder forward)
+            const h = isLHP ? -1.0 : 1.0;
             // Normalize arm angle (0 = horizontal sidearm / submarine, 1 = direct vertical overhand)
             const angleRad = (armAngle * Math.PI) / 180.0;
             const slotFactor = clamp(armAngle / 70.0, 0.0, 1.2); // 0.0 for low sidearm, 1.0+ for overhand

@@ -3,3 +3,5 @@
 coverage.out
 *.pt
 *.mp4
+__pycache__/
+*.pyc
