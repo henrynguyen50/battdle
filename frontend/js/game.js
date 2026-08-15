@@ -48,7 +48,7 @@ const PitchleGame = {
                     const origText = leaderboardBtn.innerHTML;
                     leaderboardBtn.innerHTML = '<span class="leaderboard-icon">⏳</span> Loading...';
                     
-                    const [daily, streaks] = await Promise.all([
+                    const [daily, streaks, stats] = await Promise.all([
                         window.PitchleAPI.getDailyLeaderboard().catch(err => {
                             console.warn('Failed to load daily leaderboard:', err);
                             return [];
@@ -56,10 +56,14 @@ const PitchleGame = {
                         window.PitchleAPI.getStreakLeaderboard().catch(err => {
                             console.warn('Failed to load streaks leaderboard:', err);
                             return [];
+                        }),
+                        window.PitchleAPI.getTodayStats().catch(err => {
+                            console.warn('Failed to load today stats:', err);
+                            return null;
                         })
                     ]);
 
-                    window.PitchleUI.showLeaderboardModal(daily, streaks);
+                    window.PitchleUI.showLeaderboardModal(daily, streaks, stats);
                     leaderboardBtn.innerHTML = origText;
                 } catch (err) {
                     alert('Could not load leaderboard: ' + err.message);
@@ -80,24 +84,21 @@ const PitchleGame = {
         // Wire leaderboard tab switching
         const tabDaily = document.getElementById('tab-daily-leaderboard');
         const tabStreak = document.getElementById('tab-streak-leaderboard');
+        const tabStats = document.getElementById('tab-stats-leaderboard');
         const panelDaily = document.getElementById('panel-daily-leaderboard');
         const panelStreak = document.getElementById('panel-streak-leaderboard');
+        const panelStats = document.getElementById('panel-stats-leaderboard');
 
-        if (tabDaily && tabStreak && panelDaily && panelStreak) {
-            tabDaily.addEventListener('click', () => {
-                tabDaily.classList.add('active');
-                tabStreak.classList.remove('active');
-                panelDaily.style.display = 'block';
-                panelStreak.style.display = 'none';
-            });
+        const selectLeaderboardTab = (activeTab, activePanel) => {
+            [tabDaily, tabStreak, tabStats].forEach(t => t && t.classList.remove('active'));
+            [panelDaily, panelStreak, panelStats].forEach(p => p && (p.style.display = 'none'));
+            if (activeTab) activeTab.classList.add('active');
+            if (activePanel) activePanel.style.display = 'block';
+        };
 
-            tabStreak.addEventListener('click', () => {
-                tabStreak.classList.add('active');
-                tabDaily.classList.remove('active');
-                panelStreak.style.display = 'block';
-                panelDaily.style.display = 'none';
-            });
-        }
+        if (tabDaily) tabDaily.addEventListener('click', () => selectLeaderboardTab(tabDaily, panelDaily));
+        if (tabStreak) tabStreak.addEventListener('click', () => selectLeaderboardTab(tabStreak, panelStreak));
+        if (tabStats) tabStats.addEventListener('click', () => selectLeaderboardTab(tabStats, panelStats));
 
         // Wire Share Score button
         const shareBtn = document.getElementById('btn-share-score');

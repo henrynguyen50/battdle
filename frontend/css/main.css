@@ -819,6 +819,9 @@ td:first-child {
 /* Rules Modal */
 .rules-modal-content {
     max-width: 580px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
     text-align: left;
 }
 

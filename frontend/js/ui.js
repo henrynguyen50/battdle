@@ -231,8 +231,8 @@ const PitchleUI = {
         return text;
     },
 
-    renderGuessDistribution(distribution, userGuessCount, isWon = false) {
-        const container = document.getElementById('guess-distribution-chart');
+    renderGuessDistribution(distribution, userGuessCount, isWon = false, containerId = 'guess-distribution-chart') {
+        const container = document.getElementById(containerId);
         if (!container) return;
         container.innerHTML = '';
 
@@ -398,7 +398,7 @@ const PitchleUI = {
         }
     },
 
-    showLeaderboardModal(dailyEntries = [], streakEntries = []) {
+    showLeaderboardModal(dailyEntries = [], streakEntries = [], stats = null) {
         const modal = document.getElementById('leaderboard-modal');
         if (!modal) return;
 
@@ -483,6 +483,27 @@ const PitchleUI = {
                 if (streakEmpty) streakEmpty.style.display = 'block';
             }
         }
+
+        // Render Personal Stats in Leaderboard Modal
+        const statPlayed = document.getElementById('leaderboard-stat-played');
+        const statWinRate = document.getElementById('leaderboard-stat-win-rate');
+        const statCurrentStreak = document.getElementById('leaderboard-stat-current-streak');
+        const statMaxStreak = document.getElementById('leaderboard-stat-max-streak');
+
+        const userStats = stats?.user_stats;
+        const played = userStats?.games_played ?? 0;
+        const won = userStats?.games_won ?? 0;
+        const winRate = played > 0 ? Math.round((won / played) * 100) : 0;
+        const currentStreak = userStats?.current_streak ?? 0;
+        const maxStreak = userStats?.max_streak ?? 0;
+
+        if (statPlayed) statPlayed.textContent = played;
+        if (statWinRate) statWinRate.textContent = `${winRate}%`;
+        if (statCurrentStreak) statCurrentStreak.textContent = currentStreak;
+        if (statMaxStreak) statMaxStreak.textContent = maxStreak;
+
+        // Render Guess Distribution for Leaderboard Modal
+        this.renderGuessDistribution(stats?.distribution, userStats?.user_guess_count, userStats?.solved, 'leaderboard-guess-distribution-chart');
 
         modal.style.display = 'flex';
     },
