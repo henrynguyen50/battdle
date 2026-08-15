@@ -13,7 +13,8 @@ type Point3D struct {
 }
 
 // CalculateTrajectory computes a 3D trajectory from a pitch profile.
-// Incorporates realistic Magnus spin dynamics and curveball/sweeper launch hump arcs.
+//
+// RHP releases on screen RIGHT (x0 > 0), LHP releases on screen LEFT (x0 < 0).
 func CalculateTrajectory(p *models.PitchProfile) []Point3D {
 	x0 := p.ReleasePosX
 	y0 := 60.5 - p.ReleaseExtension
@@ -46,23 +47,27 @@ func CalculateTrajectory(p *models.PitchProfile) []Point3D {
 		breakZFt = breakZFt / 12.0 // Convert inches to feet
 	}
 
-	// Lateral Acceleration (ax):
-	// In Statcast, BreakX is negative for RHP arm-side run, positive for LHP arm-side run.
-	// ax = -2 * breakXFt / T^2 curves sinkers/fastballs OUTWARDS and sliders/sweepers INWARDS for both RHP and LHP.
-	ax := (-2.0 * breakXFt) / (T * T)
+	// Lateral acceleration (ax):
+	// - For RHP (x0 >= 0): ax = 2 * breakXFt / T^2 => Negative BreakX fades RIGHT (+X)
+	// - For LHP (x0 < 0): ax = -2 * breakXFt / T^2 => Positive BreakX fades LEFT (-X)
+	isRHP := x0 >= 0
+	var ax float64
+	if isRHP {
+		ax = (2.0 * breakXFt) / (T * T)
+	} else {
+		ax = (-2.0 * breakXFt) / (T * T)
+	}
+
 	// -------------------------------------------------------------
 	// Vertical Acceleration (az) & Hump Arc:
-	// Curveballs, Slurves, and Sweepers are launched with initial upward pop (hump)
-	// out of the hand before heavy topspin and gravity drag them sharply down.
 	// -------------------------------------------------------------
 	var az float64
 	humpBoost := 0.0
 	switch p.PitchType {
 	case "Curveball", "Slurve", "Sweeper":
-		humpBoost = 18.0 // Produces upward pop (hump) out of the hand before sharp drop/sweep
+		humpBoost = 18.0 // Produces upward pop (hump) out of the hand
 	}
 
-	// Total vertical acceleration (downward gravity + topspin)
 	az = (2.0*breakZFt)/(T*T) - humpBoost
 
 	// Solve initial velocities to satisfy boundary conditions at t = T

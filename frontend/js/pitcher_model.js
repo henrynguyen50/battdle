@@ -241,7 +241,7 @@
             // -------------------------------------------------------------
             const shoulderR = new THREE.Group();
             shoulderR.name = 'shoulderR';
-            shoulderR.position.set(-0.78, 0.2, 0);
+            shoulderR.position.set(0.78, 0.2, 0);
             chest.add(shoulderR);
             this.bones.shoulderR = shoulderR;
 
@@ -314,7 +314,7 @@
             // -------------------------------------------------------------
             const shoulderL = new THREE.Group();
             shoulderL.name = 'shoulderL';
-            shoulderL.position.set(0.78, 0.2, 0);
+            shoulderL.position.set(-0.78, 0.2, 0);
             chest.add(shoulderL);
             this.bones.shoulderL = shoulderL;
 
@@ -380,7 +380,7 @@
             // -------------------------------------------------------------
             const hipR = new THREE.Group();
             hipR.name = 'hipR';
-            hipR.position.set(-0.32, -0.2, 0);
+            hipR.position.set(0.32, -0.2, 0);
             pelvis.add(hipR);
             this.bones.hipR = hipR;
 
@@ -433,7 +433,7 @@
             // -------------------------------------------------------------
             const hipL = new THREE.Group();
             hipL.name = 'hipL';
-            hipL.position.set(0.32, -0.2, 0);
+            hipL.position.set(-0.32, -0.2, 0);
             pelvis.add(hipL);
             this.bones.hipL = hipL;
 

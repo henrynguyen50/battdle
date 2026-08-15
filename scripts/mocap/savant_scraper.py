@@ -8,9 +8,9 @@ import os
 import re
 import csv
 import json
+import html
 import urllib.request
 import urllib.error
-
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 def get_pitcher_video_url(mlb_id):
@@ -77,18 +77,18 @@ def get_pitcher_video_url(mlb_id):
     
     try:
         with urllib.request.urlopen(sporty_req, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
-            mp4_matches = re.findall(r'https://sporty-clips\.mlb\.com/[^\s\"\'<>]+\.mp4', html)
+            raw_html = resp.read().decode("utf-8", errors="ignore")
+            unescaped_html = html.unescape(raw_html)
+            mp4_matches = re.findall(r'https://sporty-clips\.mlb\.com/[^\s\"\'<>]+\.mp4', unescaped_html)
             if mp4_matches:
                 return mp4_matches[0]
             # Fallback pattern
-            mp4_matches = re.findall(r'https://[^\s\"\'<>]+\.mp4', html)
+            mp4_matches = re.findall(r'https://[^\s\"\'<>]+\.mp4', unescaped_html)
             if mp4_matches:
                 return mp4_matches[0]
     except Exception as e:
         print(f"Error querying sporty-videos for play {play_id}: {e}")
         return None
-
     return None
 
 def download_pitcher_video(mlb_id, output_path):
